@@ -124,5 +124,118 @@ public class GdImage {
 		return (!(((y < cy1) || (y > cy2)) || ((x < cx1) || (x > cx2))));
 	}
 
+	/*
+		Function: gdImageCreate
+	
+		  gdImageCreate is called to create palette-based images, with no
+		  more than 256 colors. The image must eventually be destroyed using
+		  gdImageDestroy().
+	
+		Parameters:
+	
+			sx - The image width.
+			sy - The image height.
+	
+		Returns:
+	
+			A pointer to the new image or NULL if an error occurred.
+	
+		Example:
+	
+			>   gdImagePtr im;
+			>   im = gdImageCreate(64, 64);
+			>   // ... Use the image ...
+			>   gdImageDestroy(im);
+	
+		See Also:
+	
+			<gdImageCreateTrueColor>        
+	
+	 */
+	public GdImage(final int sx, final int sy) {
+		pixels = new byte[sy][sx];
+		this.sx = sx;
+		this.sy = sy;
+		colorsTotal = 0;
+		transparent = (-1);
+		interlace = 0;
+		thick = 1;
+		AA = 0;
+		for (int i = 0; (i < GdUtils.MAX_COLORS); i++) {
+			open[i] = 1;
+		};
+		trueColor = 0;
+		cx1 = 0;
+		cy1 = 0;
+		cx2 = sx - 1;
+		cy2 = sy - 1;
+		res_x = GdUtils.GD_RESOLUTION;
+		res_y = GdUtils.GD_RESOLUTION;
+//		interpolation = NULL;
+		interpolation_id = GdInterpolationMethod.GD_BILINEAR_FIXED;
+	}
+
+
+
+
+	/*
+		Function: gdImageCreateTrueColor
+	
+		  <gdImageCreateTrueColor> is called to create truecolor images,
+		  with an essentially unlimited number of colors. Invoke
+		  <gdImageCreateTrueColor> with the x and y dimensions of the
+		  desired image. <gdImageCreateTrueColor> returns a <gdImagePtr>
+		  to the new image, or NULL if unable to allocate the image. The
+		  image must eventually be destroyed using <gdImageDestroy>().
+	
+		  Truecolor images are always filled with black at creation
+		  time. There is no concept of a "background" color index.
+	
+		Parameters:
+	
+			sx - The image width.
+			sy - The image height.
+	
+		Returns:
+	
+			A pointer to the new image or NULL if an error occurred.
+	
+		Example:
+	
+			> gdImagePtr im;
+			> im = gdImageCreateTrueColor(64, 64);
+			> // ... Use the image ...
+			> gdImageDestroy(im);
+	
+		See Also:
+	
+			<gdImageCreateTrueColor>        
+	
+	*/
+	public GdImage(final int sx, final int sy, final boolean truecolor) {
+		pixels = new byte[sy][sx];
+		this.sx = sx;
+		this.sy = sy;
+		transparent = (-1);
+		interlace = 0;
+		trueColor = 1;
+	/* 2.0.2: alpha blending is now on by default, and saving of alpha is
+	   off by default. This allows font antialiasing to work as expected
+	   on the first try in JPEGs -- quite important -- and also allows
+	   for smaller PNGs when saving of alpha channel is not really
+	   desired, which it usually isn't! */
+		saveAlphaFlag = 0;
+		alphaBlendingFlag = 1;
+		thick = 1;
+		AA = 0;
+		cx1 = 0;
+		cy1 = 0;
+		cx2 = sx - 1;
+		cy2 = sy - 1;
+		res_x = GdUtils.GD_RESOLUTION;
+		res_y = GdUtils.GD_RESOLUTION;
+//		interpolation = NULL;
+		interpolation_id = GdInterpolationMethod.GD_BILINEAR_FIXED;
+	}
 
 }
