@@ -1,5 +1,8 @@
 package info.miranda.gd;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /* gd.h: declarations file for the graphic-draw module.
  * Permission to use, copy, modify, and distribute this software and its
  * documentation for any purpose and without fee is hereby granted, provided
@@ -11,7 +14,8 @@ package info.miranda.gd;
  * fitness for a particular purpose, with respect to this code and accompanying
  * documentation. */
 public class GdUtils {
-	
+
+	private static Logger LOG = LoggerFactory.getLogger(GdUtils.class);
 	
 /* The maximum number of palette entries in palette-based images.
    In the wonderful new world of gd 2.0, you can of course have
@@ -49,6 +53,9 @@ public class GdUtils {
 
 	public static final double GD_EPSILON = 1e-6;
 
+	/* resolution affects ttf font rendering, particularly hinting */
+	public static final int GD_RESOLUTION = 96;      /* pixels per inch */
+
 	public static int gdTrueColorGetAlpha(final int c) {
 		return (((c) & 0x7F000000) >> 24);
 	}
@@ -76,6 +83,49 @@ public class GdUtils {
    opaque. */
 	public static int gdTrueColorAlpha(final int r, final int g, final int b, final int a) {
 		return (((a) << 24) + ((r) << 16) + ((g) << 8) + (b));
+	}
+
+	public static double DPCM2DPI(final double dpcm) {
+		return ((dpcm)*2.54 + 0.5);
+	}
+
+	public static double DPM2DPI(final double dpm) {
+		return ((dpm) * 0.0254 + 0.5);
+	}
+
+	public static double DPI2DPCM(final double dpi) {
+		return ((dpi)/2.54 + 0.5);
+	}
+
+	public static double DPI2DPM(final double dpi) {
+		return ((dpi)/0.0254 + 0.5);
+	}
+
+/*
+   * gd_security.c
+   *
+   * Implements buffer overflow check routines.
+   *
+   * Written 2004, Phil Knirsch.
+   * Based on netpbm fixes by Alan Cox.
+   *
+ */
+	/* Returns nonzero if multiplying the two quantities will
+		result in integer overflow. Also returns nonzero if
+		either quantity is negative. By Phil Knirsch based on
+		netpbm fixes by Alan Cox. */
+	public static boolean overflow2(final long a, final long b) {
+		if(a <= 0 || b <= 0) {
+			LOG.warn("one parameter to a memory allocation multiplication is negative or zero, failing operation gracefully");
+			return true;
+		}
+
+		if(a > Integer.MAX_VALUE / b) {
+			LOG.warn("product of memory allocation multiplication would exceed INT_MAX, failing operation gracefully");
+			return true;
+		}
+
+		return false;
 	}
 
 }

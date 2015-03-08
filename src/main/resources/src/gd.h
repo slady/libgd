@@ -729,28 +729,6 @@ BGD_DECLARE(void) gdImageFlipBoth(gdImagePtr im);
 #define GD_FLIP_VERTICAL 2
 #define GD_FLIP_BOTH 3
 
-/**
- * Group: Crop
- *
- * Constants: gdCropMode
- *  GD_CROP_DEFAULT - Default crop mode (4 corners or background)
- *  GD_CROP_TRANSPARENT - Crop using the transparent color
- *  GD_CROP_BLACK - Crop black borders
- *  GD_CROP_WHITE - Crop white borders
- *  GD_CROP_SIDES - Crop using colors of the 4 corners
- *
- * See also:
- *  <gdImageAutoCrop>
- **/
-enum gdCropMode {
-	GD_CROP_DEFAULT = 0,
-	GD_CROP_TRANSPARENT,
-	GD_CROP_BLACK,
-	GD_CROP_WHITE,
-	GD_CROP_SIDES,
-	GD_CROP_THRESHOLD
-};
-
 BGD_DECLARE(gdImagePtr) gdImageCrop(gdImagePtr src, const gdRect *crop);
 BGD_DECLARE(gdImagePtr) gdImageCropAuto(gdImagePtr im, const unsigned int mode);
 BGD_DECLARE(gdImagePtr) gdImageCropThreshold(gdImagePtr im, const unsigned int color, const float threshold);
@@ -761,14 +739,6 @@ BGD_DECLARE(gdInterpolationMethod) gdImageGetInterpolationMethod(gdImagePtr im);
 BGD_DECLARE(gdImagePtr) gdImageScale(const gdImagePtr src, const unsigned int new_width, const unsigned int new_height);
 
 BGD_DECLARE(gdImagePtr) gdImageRotateInterpolated(const gdImagePtr src, const float angle, int bgcolor);
-
-typedef enum {
-	GD_AFFINE_TRANSLATE = 0,
-	GD_AFFINE_SCALE,
-	GD_AFFINE_ROTATE,
-	GD_AFFINE_SHEAR_HORIZONTAL,
-	GD_AFFINE_SHEAR_VERTICAL
-} gdAffineStandardMatrix;
 
 BGD_DECLARE(int) gdAffineApplyToPointF (gdPointFPtr dst, const gdPointFPtr src, const double affine[6]);
 BGD_DECLARE(int) gdAffineInvert (double dst[6], const double src[6]);
@@ -803,8 +773,6 @@ BGD_DECLARE(int) gdTransformAffineBoundingBox(gdRectPtr src, const double affine
 #define GD_CMP_INTERLACE	128	/* Interlaced setting */
 #define GD_CMP_TRUECOLOR	256	/* Truecolor vs palette differs */
 
-/* resolution affects ttf font rendering, particularly hinting */
-#define GD_RESOLUTION           96      /* pixels per inch */
 
 
 /* Version information functions */

@@ -63,12 +63,3 @@ gd_strtok_r (char *s, char *sep, char **state)
 	*state = s;
 	return result;
 }
-
-void *
-gdReallocEx (void *ptr, size_t size)
-{
-	void *newPtr = gdRealloc (ptr, size);
-	if (!newPtr && ptr)
-		gdFree(ptr);
-	return newPtr;
-}
