@@ -1017,6 +1017,14 @@ public class GdImage {
 	}
 
 
+	/* Replaces or blends with the background depending on the
+	   most recent call to gdImageAlphaBlending and the
+	   alpha channel value of 'color'; default is to overwrite.
+	   Tiling and line styling are also implemented
+	   here. All other gd drawing functions pass through this call,
+	   allowing for many useful effects.
+	   Overlay and multiply effects are used when gdImageAlphaBlending
+	   is passed gdEffectOverlay and gdEffectMultiply */
 	public void setPixel(final int x, final int y, final int color) {
 		int p;
 		switch (color) {
