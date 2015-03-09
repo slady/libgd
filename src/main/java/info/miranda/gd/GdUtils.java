@@ -66,6 +66,11 @@ public class GdUtils {
 	public static final int SPECIAL_COLOR_TRANSPARENT = (-6);
 	public static final int SPECIAL_COLOR_ANTI_ALIASED = (-7);
 
+/* For backwards compatibility only. Use gdImageSetStyle()
+   for MUCH more flexible line drawing. Also see
+   gdImageSetBrush(). */
+	public static final int DASH_SIZE = 4;
+
 	public static int gdTrueColorGetAlpha(final int c) {
 		return (((c) & 0x7F000000) >> 24);
 	}

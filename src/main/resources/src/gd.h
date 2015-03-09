@@ -19,29 +19,7 @@ extern "C" {
 
 /* define struct with name and func ptr and add it to gdImageStruct gdInterpolationMethod interpolation; */
 
-/* Interpolation function ptr */
-typedef double (* interpolation_method )(double);
-
-typedef void(*gdErrorMethod)(int, const char *, va_list);
-
-BGD_DECLARE(void) gdSetErrorMethod(gdErrorMethod);
-BGD_DECLARE(void) gdClearErrorMethod(void);
-
-/* For backwards compatibility only. Use gdImageSetStyle()
-   for MUCH more flexible line drawing. Also see
-   gdImageSetBrush(). */
-#define gdDashSize 4
-
 /* Functions to manipulate images. */
-
-/* Creates a palette-based image (up to 256 colors). */
-BGD_DECLARE(gdImagePtr) gdImageCreate (int sx, int sy);
-
-/* An alternate name for the above (2.0). */
-#define gdImageCreatePalette gdImageCreate
-
-/* Creates a truecolor image (millions of colors). */
-BGD_DECLARE(gdImagePtr) gdImageCreateTrueColor (int sx, int sy);
 
 /* Creates an image from various file types. These functions
    return a palette or truecolor image based on the
