@@ -1263,4 +1263,488 @@ public class GdImage {
 		return op;			/* Return newly allocated color */
 	}
 
+	/* Bresenham as presented in Foley & Van Dam */
+	public void gdImageLine(final int x1, final int y1, final int x2, final int y2, final int color) {
+		int dx, dy, incr1, incr2, d, x, y, xend, yend, xdirflag, ydirflag;
+		int wid;
+		int w, wstart;
+
+		if (color == GdUtils.SPECIAL_COLOR_ANTI_ALIASED) {
+		/*
+		  gdAntiAliased passed as color: use the much faster, much cheaper
+		  and equally attractive gdImageAALine implementation. That
+		  clips too, so don't clip twice.
+		*/
+			gdImageAALine(x1, y1, x2, y2, AA_color);
+			return;
+		}
+	/* 2.0.10: Nick Atty: clip to edges of drawing rectangle, return if no
+	   points need to be drawn. 2.0.26, TBB: clip to edges of clipping
+	   rectangle. We were getting away with this because gdImageSetPixel
+	   is used for actual drawing, but this is still more efficient and opens
+	   the way to skip per-pixel bounds checking in the future. */
+
+		final RecClip clip1 = new RecClip(x1, y1, x2, y2);
+		if (clip_1d(clip1, cx1, cx2) == 0)
+			return;
+
+		final RecClip clip2 = new RecClip(y1, x1, y2, x2);
+		if (clip_1d(clip2, cy1, cy2) == 0)
+			return;
+
+		dx = Math.abs(x2 - x1);
+		dy = Math.abs(y2 - y1);
+
+		if (dx == 0) {
+			gdImageVLine(x1, y1, y2, color);
+			return;
+		} else if (dy == 0) {
+			gdImageHLine(y1, x1, x2, color);
+			return;
+		}
+
+		if (dy <= dx) {
+		/* More-or-less horizontal. use wid for vertical stroke */
+		/* Doug Claar: watch out for NaN in atan2 (2.0.5) */
+			if ((dx == 0) && (dy == 0)) {
+				wid = 1;
+			} else {
+			/* 2.0.12: Michael Schwartz: divide rather than multiply;
+			   TBB: but watch out for /0! */
+				double ac = Math.cos(Math.atan2(dy, dx));
+				if (ac != 0) {
+					wid = (int) (thick / ac);
+				} else {
+					wid = 1;
+				}
+				if (wid == 0) {
+					wid = 1;
+				}
+			}
+			d = 2 * dy - dx;
+			incr1 = 2 * dy;
+			incr2 = 2 * (dy - dx);
+			if (x1 > x2) {
+				x = x2;
+				y = y2;
+				ydirflag = (-1);
+				xend = x1;
+			} else {
+				x = x1;
+				y = y1;
+				ydirflag = 1;
+				xend = x2;
+			}
+
+		/* Set up line thickness */
+			wstart = y - wid / 2;
+			for (w = wstart; w < wstart + wid; w++)
+				setPixel(x, w, color);
+
+			if (((y2 - y1) * ydirflag) > 0) {
+				while (x < xend) {
+					x++;
+					if (d < 0) {
+						d += incr1;
+					} else {
+						y++;
+						d += incr2;
+					}
+					wstart = y - wid / 2;
+					for (w = wstart; w < wstart + wid; w++)
+						setPixel(x, w, color);
+				}
+			} else {
+				while (x < xend) {
+					x++;
+					if (d < 0) {
+						d += incr1;
+					} else {
+						y--;
+						d += incr2;
+					}
+					wstart = y - wid / 2;
+					for (w = wstart; w < wstart + wid; w++)
+						setPixel(x, w, color);
+				}
+			}
+		} else {
+		/* More-or-less vertical. use wid for horizontal stroke */
+		/* 2.0.12: Michael Schwartz: divide rather than multiply;
+		   TBB: but watch out for /0! */
+			double as = Math.sin(Math.atan2(dy, dx));
+			if (as != 0) {
+				wid = (int) (thick / as);
+			} else {
+				wid = 1;
+			}
+			if (wid == 0)
+				wid = 1;
+
+			d = 2 * dx - dy;
+			incr1 = 2 * dx;
+			incr2 = 2 * (dx - dy);
+			if (y1 > y2) {
+				y = y2;
+				x = x2;
+				yend = y1;
+				xdirflag = (-1);
+			} else {
+				y = y1;
+				x = x1;
+				yend = y2;
+				xdirflag = 1;
+			}
+
+		/* Set up line thickness */
+			wstart = x - wid / 2;
+			for (w = wstart; w < wstart + wid; w++)
+				setPixel(w, y, color);
+
+			if (((x2 - x1) * xdirflag) > 0) {
+				while (y < yend) {
+					y++;
+					if (d < 0) {
+						d += incr1;
+					} else {
+						x++;
+						d += incr2;
+					}
+					wstart = x - wid / 2;
+					for (w = wstart; w < wstart + wid; w++)
+						setPixel(w, y, color);
+				}
+			} else {
+				while (y < yend) {
+					y++;
+					if (d < 0) {
+						d += incr1;
+					} else {
+						x--;
+						d += incr2;
+					}
+					wstart = x - wid / 2;
+					for (w = wstart; w < wstart + wid; w++)
+						setPixel(w, y, color);
+				}
+			}
+		}
+	}
+
+	class RecClip {
+		int x0, y0, x1, y1;
+		RecClip(final int x0, final int y0, final int x1, final int y1) {
+			this.x0 = x0;
+			this.y0 = y0;
+			this.x1 = x1;
+			this.y1 = y1;
+		}
+	}
+
+/* 2.0.10: before the drawing routines, some code to clip points that are
+ * outside the drawing window.  Nick Atty (nick@canalplan.org.uk)
+ *
+ * This is the Sutherland Hodgman Algorithm, as implemented by
+ * Duvanenko, Robbins and Gyurcsik - SH(DRG) for short.  See Dr Dobb's
+ * Journal, January 1996, pp107-110 and 116-117
+ *
+ * Given the end points of a line, and a bounding rectangle (which we
+ * know to be from (0,0) to (SX,SY)), adjust the endpoints to be on
+ * the edges of the rectangle if the line should be drawn at all,
+ * otherwise return a failure code */
+
+/* this does "one-dimensional" clipping: note that the second time it
+   is called, all the x parameters refer to height and the y to width
+   - the comments ignore this (if you can understand it when it's
+   looking at the X parameters, it should become clear what happens on
+   the second call!)  The code is simplified from that in the article,
+   as we know that gd images always start at (0,0) */
+
+/* 2.0.26, TBB: we now have to respect a clipping rectangle, it won't
+	necessarily start at 0. */
+
+	private int clip_1d(final RecClip clip, final int mindim, final int maxdim)
+	{
+		double m;			/* gradient of line */
+		if (clip.x0 < mindim) {
+		/* start of line is left of window */
+		if (clip.x1 < mindim)		/* as is the end, so the line never cuts the window */
+		return 0;
+		m = (clip.y1 - clip.y0) / (double) (clip.x1 - clip.x0);	/* calculate the slope of the line */
+		/* adjust x0 to be on the left boundary (ie to be zero), and y0 to match */
+		clip.y0 -= (int)(m * (clip.x0 - mindim));
+		clip.x0 = mindim;
+		/* now, perhaps, adjust the far end of the line as well */
+		if (clip.x1 > maxdim) {
+			clip.y1 += m * (maxdim - clip.x1);
+			clip.x1 = maxdim;
+		}
+		return 1;
+	}
+		if (clip.x0 > maxdim) {
+		/* start of line is right of window -
+		complement of above */
+		if (clip.x1 > maxdim)		/* as is the end, so the line misses the window */
+		return 0;
+		m = (clip.y1 - clip.y0) / (double) (clip.x1 - clip.x0);	/* calculate the slope of the line */
+		clip.y0 += (int)(m * (maxdim - clip.x0));	/* adjust so point is on the right
+							   boundary */
+		clip.x0 = maxdim;
+		/* now, perhaps, adjust the end of the line */
+		if (clip.x1 < mindim) {
+			clip.y1 -= (int)(m * (clip.x1 - mindim));
+			clip.x1 = mindim;
+		}
+		return 1;
+	}
+	/* the final case - the start of the line is inside the window */
+		if (clip.x1 > maxdim) {
+		/* other end is outside to the right */
+		m = (clip.y1 - clip.y0) / (double) (clip.x1 - clip.x0);	/* calculate the slope of the line */
+		clip.y1 += (int)(m * (maxdim - clip.x1));
+		clip.x1 = maxdim;
+		return 1;
+	}
+		if (clip.x1 < mindim) {
+		/* other end is outside to the left */
+		m = (clip.y1 - clip.y0) / (double) (clip.x1 - clip.x0);	/* calculate the slope of the line */
+		clip.y1 -= (int)(m * (clip.x1 - mindim));
+		clip.x1 = mindim;
+		return 1;
+	}
+	/* only get here if both points are inside the window */
+		return 1;
+	}
+
+	private void gdImageVLine(final int x, int y1, int y2, final int col) {
+		if (thick > 1) {
+			int thickhalf = thick >> 1;
+			gdImageFilledRectangle(x - thickhalf, y1, x + thick - thickhalf - 1, y2, col);
+		} else {
+			if (y2 < y1) {
+				int t = y1;
+				y1 = y2;
+				y2 = t;
+			}
+
+			for (; y1 <= y2; y1++) {
+				setPixel(x, y1, col);
+			}
+		}
+		return;
+	}
+
+	private void gdImageHLine(int y, int x1, int x2, final int col)
+	{
+		if (thick > 1) {
+			int thickhalf = thick >> 1;
+			gdImageFilledRectangle(x1, y - thickhalf, x2, y + thick - thickhalf - 1, col);
+		} else {
+			if (x2 < x1) {
+				int t = x2;
+				x2 = x1;
+				x1 = t;
+			}
+
+			for (; x1 <= x2; x1++) {
+				setPixel(x1, y, col);
+			}
+		}
+		return;
+	}
+
+
+	private void gdImageAALine(int x1, int y1, int x2, int y2, final int col) {
+	/* keep them as 32bits */
+		long x, y, inc, frac;
+		long dx, dy,tmp;
+		int w, wid, wstart;
+
+		if (!trueColor) {
+		/* TBB: don't crash when the image is of the wrong type */
+			gdImageLine(x1, y1, x2, y2, col);
+			return;
+		}
+
+	/* TBB: use the clipping rectangle */
+		final RecClip clip1 = new RecClip(x1, y1, x2, y2);
+		if (clip_1d(clip1, cx1, cx2) == 0)
+			return;
+
+		final RecClip clip2 = new RecClip(y1, x1, y2, x2);
+		if (clip_1d(clip2, cy1, cy2) == 0)
+			return;
+
+		dx = x2 - x1;
+		dy = y2 - y1;
+
+		if (dx == 0 && dy == 0) {
+		/* TBB: allow setting points */
+			gdImageSetAAPixelColor(x1, y1, col, 0xFF);
+			return;
+		} else {
+			double ag;
+			ag = (Math.abs(dy) < Math.abs(dx)) ? Math.cos(Math.atan2(dy, dx)) : Math.sin(Math.atan2(dy, dx));
+			if (ag != 0) {
+				wid = (int) Math.abs(thick / ag);
+			} else {
+				wid = 1;
+			}
+			if (wid == 0) {
+				wid = 1;
+			}
+		}
+
+	/* Axis aligned lines */
+		if (dx == 0) {
+			gdImageVLine(x1, y1, y2, col);
+			return;
+		} else if (dy == 0) {
+			gdImageHLine(y1, x1, x2, col);
+			return;
+		}
+
+		if (Math.abs(dx) > Math.abs(dy)) {
+			if (dx < 0) {
+				tmp = x1;
+				x1 = x2;
+				x2 = (int) tmp;
+				tmp = y1;
+				y1 = y2;
+				y2 = (int) tmp;
+				dx = x2 - x1;
+				dy = y2 - y1;
+			}
+			y = y1;
+			inc = (dy * 65536) / dx;
+			frac = 0;
+		/* TBB: set the last pixel for consistency (<=) */
+			for (x = x1 ; x <= x2 ; x++) {
+				wstart = (int) (y - wid / 2);
+				for (w = wstart; w < wstart + wid; w++) {
+					gdImageSetAAPixelColor((int) x, w, col, (int) ((frac >> 8) & 0xFF));
+					gdImageSetAAPixelColor((int) x, w + 1, col, (int) ((~frac >> 8) & 0xFF));
+				}
+				frac += inc;
+				if (frac >= 65536) {
+					frac -= 65536;
+					y++;
+				} else if (frac < 0) {
+					frac += 65536;
+					y--;
+				}
+			}
+		} else {
+			if (dy < 0) {
+				tmp = x1;
+				x1 = x2;
+				x2 = (int) tmp;
+				tmp = y1;
+				y1 = y2;
+				y2 = (int) tmp;
+				dx = x2 - x1;
+				dy = y2 - y1;
+			}
+			x = x1;
+			inc = (dx * 65536) / dy;
+			frac = 0;
+		/* TBB: set the last pixel for consistency (<=) */
+			for (y = y1 ; y <= y2 ; y++) {
+				wstart = (int) (x - wid / 2);
+				for (w = wstart; w < wstart + wid; w++) {
+					gdImageSetAAPixelColor(w, (int) y, col, (int) ((frac >> 8) & 0xFF));
+					gdImageSetAAPixelColor(w + 1, (int) y, col, (int) ((~frac >> 8) & 0xFF));
+				}
+				frac += inc;
+				if (frac >= 65536) {
+					frac -= 65536;
+					x++;
+				} else if (frac < 0) {
+					frac += 65536;
+					x--;
+				}
+			}
+		}
+	}
+
+	private void gdImageSetAAPixelColor(final int x, final int y, final int color, final int t) {
+		int dr,dg,db,p,r,g,b;
+
+	/* 2.0.34: watch out for out of range calls */
+		if (!gdImageBoundsSafeMacro(x, y)) {
+			return;
+		}
+		p = getPixel(x, y);
+	/* TBB: we have to implement the dont_blend stuff to provide
+	  the full feature set of the old implementation */
+		if ((p == color)
+				|| ((p == AA_dont_blend)
+				&& (t != 0x00))) {
+		return;
+	}
+		dr = GdUtils.gdTrueColorGetRed(color);
+		dg = GdUtils.gdTrueColorGetGreen(color);
+		db = GdUtils.gdTrueColorGetBlue(color);
+
+		r = GdUtils.gdTrueColorGetRed(p);
+		g = GdUtils.gdTrueColorGetGreen(p);
+		b = GdUtils.gdTrueColorGetBlue(p);
+
+		dr = blendColor(t, r, dr);
+		dg = blendColor(t, g, dg);
+		db = blendColor(t, b, db);
+		tpixels[y][x] = GdUtils.gdTrueColorAlpha(dr, dg, db, GdUtils.ALPHA_OPAQUE);
+	}
+
+	/**
+ 	 * Added on 2003/12 by Pierre-Alain Joye (pajoye@pearfr.org)
+	 **/
+	private int blendColor(final int a, final int c, final int cc) {
+		return (cc) + (((((c) - (cc)) * (a)) + ((((c) - (cc)) * (a)) >> 8) + 0x80) >> 8);
+	}
+
+	/* Solid bar. Upper left corner first, lower right corner second. */
+	public void gdImageFilledRectangle (int x1, int y1, int x2, int y2, final int color) {
+		int x, y;
+
+		if (x1 == x2 && y1 == y2) {
+			setPixel(x1, y1, color);
+			return;
+		}
+
+		if (x1 > x2) {
+			x = x1;
+			x1 = x2;
+			x2 = x;
+		}
+
+		if (y1 > y2) {
+			y = y1;
+			y1 = y2;
+			y2 = y;
+		}
+
+		if (x1 < 0) {
+			x1 = 0;
+		}
+
+		if (x2 >= sx) {
+			x2 = sx - 1;
+		}
+
+		if (y1 < 0) {
+			y1 = 0;
+		}
+
+		if (y2 >= sy) {
+			y2 = sy - 1;
+		}
+
+		for (y = y1; (y <= y2); y++) {
+			for (x = x1; (x <= x2); x++) {
+				setPixel(x, y, color);
+			}
+		}
+	}
+
 }

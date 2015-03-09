@@ -122,12 +122,7 @@ BGD_DECLARE(gdImagePtr) gdImageCreateFromXpm (char *filename);
 
 /* FreeType 2 text output with hook to extra flags */
 
-BGD_DECLARE(int) gdImageGetPixel (gdImagePtr im, int x, int y);
-BGD_DECLARE(int) gdImageGetTrueColorPixel (gdImagePtr im, int x, int y);
-
 BGD_DECLARE(void) gdImageAABlend (gdImagePtr im);
-
-BGD_DECLARE(void) gdImageLine (gdImagePtr im, int x1, int y1, int x2, int y2, int color);
 
 /* For backwards compatibility only. Use gdImageSetStyle()
    for much more flexible line drawing. */
@@ -137,9 +132,6 @@ BGD_DECLARE(void) gdImageDashedLine (gdImagePtr im, int x1, int y1, int x2, int 
    second. */
 BGD_DECLARE(void) gdImageRectangle (gdImagePtr im, int x1, int y1, int x2, int y2,
                                     int color);
-/* Solid bar. Upper left corner first, lower right corner second. */
-BGD_DECLARE(void) gdImageFilledRectangle (gdImagePtr im, int x1, int y1, int x2, int y2,
-					  int color);
 BGD_DECLARE(void) gdImageSetClip(gdImagePtr im, int x1, int y1, int x2, int y2);
 BGD_DECLARE(void) gdImageGetClip(gdImagePtr im, int *x1P, int *y1P, int *x2P, int *y2P);
 BGD_DECLARE(void) gdImageSetResolution(gdImagePtr im, const unsigned int res_x, const unsigned int res_y);
