@@ -16,15 +16,6 @@ extern "C" {
 #include <stdarg.h>
 #include "gd_io.h"
 
-/* This function accepts truecolor pixel values only. The
-   source color is composited with the destination color
-   based on the alpha channel value of the source color.
-   The resulting color is opaque. */
-
-BGD_DECLARE(int) gdAlphaBlend (int dest, int src);
-BGD_DECLARE(int) gdLayerOverlay (int dest, int src);
-BGD_DECLARE(int) gdLayerMultiply (int dest, int src);
-	
 
 /* define struct with name and func ptr and add it to gdImageStruct gdInterpolationMethod interpolation; */
 
@@ -40,19 +31,6 @@ BGD_DECLARE(void) gdClearErrorMethod(void);
    for MUCH more flexible line drawing. Also see
    gdImageSetBrush(). */
 #define gdDashSize 4
-
-/* Special colors. */
-
-#define gdStyled (-2)
-#define gdBrushed (-3)
-#define gdStyledBrushed (-4)
-#define gdTiled (-5)
-
-/* NOT the same as the transparent color index.
-   This is used in line styles only. */
-#define gdTransparent (-6)
-
-#define gdAntiAliased (-7)
 
 /* Functions to manipulate images. */
 

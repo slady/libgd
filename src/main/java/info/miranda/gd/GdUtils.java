@@ -56,6 +56,16 @@ public class GdUtils {
 	/* resolution affects ttf font rendering, particularly hinting */
 	public static final int GD_RESOLUTION = 96;      /* pixels per inch */
 
+	/* Special colors. */
+	public static final int SPECIAL_COLOR_STYLED = (-2);
+	public static final int SPECIAL_COLOR_BRUSHED = (-3);
+	public static final int SPECIAL_COLOR_STYLED_BRUSHED = (-4);
+	public static final int SPECIAL_COLOR_TILED = (-5);
+/* NOT the same as the transparent color index.
+   This is used in line styles only. */
+	public static final int SPECIAL_COLOR_TRANSPARENT = (-6);
+	public static final int SPECIAL_COLOR_ANTI_ALIASED = (-7);
+
 	public static int gdTrueColorGetAlpha(final int c) {
 		return (((c) & 0x7F000000) >> 24);
 	}

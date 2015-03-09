@@ -2,7 +2,7 @@ package info.miranda.gd;
 
 public enum GdEffect {
 	REPLACE,
-	ALPHABLEND,
+	ALPHA_BLEND,
 	NORMAL,
 	OVERLAY,
 	MULTIPLY
