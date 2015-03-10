@@ -836,7 +836,6 @@ public class GdImage {
 	 * @param colorType image color type, either palette or true color.
 	 */
 	public GdImage(final int sx, final int sy, final GdImageColorType colorType) {
-		pixels = new int[sy][sx];
 		this.sx = sx;
 		this.sy = sy;
 		transparent = (-1);
@@ -854,6 +853,7 @@ public class GdImage {
 
 		switch (colorType) {
 			case TRUE_COLOR:
+				tpixels = new int[sy][sx];
 				trueColor = true;
 	/* 2.0.2: alpha blending is now on by default, and saving of alpha is
 	   off by default. This allows font antialiasing to work as expected
@@ -865,6 +865,7 @@ public class GdImage {
 				break;
 
 			case PALETTE_BASED_COLOR:
+				pixels = new int[sy][sx];
 				colorsTotal = 0;
 				for (int i = 0; (i < GdUtils.MAX_COLORS); i++) {
 					open[i] = true;
@@ -1422,7 +1423,7 @@ public class GdImage {
 		}
 	}
 
-	class RectangleClip {
+	public class RectangleClip {
 		int x0, y0, x1, y1;
 		RectangleClip(final int x0, final int y0, final int x1, final int y1) {
 			this.x0 = x0;
@@ -1882,6 +1883,239 @@ public class GdImage {
 		if (c == GdUtils.SPECIAL_COLOR_ANTI_ALIASED) {
 			polygon(p, c);
 		}
+	}
+
+	public void setStyle(int[] style, int noOfPixels) {
+		this.style = new int[noOfPixels];
+		System.arraycopy(style, 0, this.style, 0, noOfPixels);
+		styleLength = noOfPixels;
+		stylePos = 0;
+	}
+
+	/* Line thickness (defaults to 1). Affects lines, ellipses,
+	   rectangles, polygons and so forth. */
+	public void setThickness(int thickness) {
+		thick = thickness;
+	}
+
+	public int getRed(final int c) {
+		return trueColor ? GdUtils.gdTrueColorGetRed(c) : red[(c)];
+	}
+
+	public int getGreen(final int c) {
+		return trueColor ? GdUtils.gdTrueColorGetGreen(c) : green[(c)];
+	}
+
+	public int getBlue(final int c) {
+		return trueColor ? GdUtils.gdTrueColorGetBlue(c) : blue[(c)];
+	}
+
+	public int getAlpha(final int c) {
+		return trueColor ? GdUtils.gdTrueColorGetAlpha(c) : alpha[(c)];
+	}
+
+	public void setBrush(final GdImage brush) {
+		int i;
+		this.brush = brush;
+		if ((!trueColor) && (!this.brush.trueColor)) {
+			for (i = 0; (i < brush.colorsTotal); i++) {
+				int index;
+				index = colorResolveAlpha(
+						brush.getRed(i),
+						brush.getGreen(i),
+						brush.getBlue(i),
+						brush.getAlpha(i));
+				brushColorMap[i] = index;
+			}
+		}
+	}
+
+	public void setTile(final GdImage tile) {
+		int i;
+		this.tile = tile;
+		if ((!trueColor) && (!tile.trueColor)) {
+			for (i = 0; (i < tile.colorsTotal); i++) {
+				int index;
+				index = colorResolveAlpha(
+						tile.getRed(i),
+						tile.getGreen(i),
+						tile.getBlue(i),
+						tile.getAlpha(i));
+				tileColorMap[i] = index;
+			}
+		}
+	}
+
+	public void setAntiAliased(final int c) {
+		AA = 1;
+		AA_color = c;
+		AA_dont_blend = -1;
+	}
+
+	public void setAntiAliasedDontBlend(final int c, final int dont_blend) {
+		AA = 1;
+		AA_color = c;
+		AA_dont_blend = dont_blend;
+	}
+
+	/* On or off (1 or 0) for all three of these. */
+	public void setInterlace(final int interlaceArg) {
+		interlace = interlaceArg;
+	}
+
+	/* Image comparison definitions */
+	public int compare(final GdImage im1, final GdImage im2) {
+		int x, y;
+		int p1, p2;
+		int cmpStatus = 0;
+		int sx, sy;
+
+		if (im1.interlace != im2.interlace) {
+			cmpStatus |= GdUtils.GD_CMP_INTERLACE;
+		}
+
+		if (im1.transparent != im2.transparent) {
+			cmpStatus |= GdUtils.GD_CMP_TRANSPARENT;
+		}
+
+		if (im1.trueColor != im2.trueColor) {
+			cmpStatus |= GdUtils.GD_CMP_TRUECOLOR;
+		}
+
+		sx = im1.sx;
+		if (im1.sx != im2.sx) {
+			cmpStatus |= GdUtils.GD_CMP_SIZE_X + GdUtils.GD_CMP_IMAGE;
+			if (im2.sx < im1.sx) {
+				sx = im2.sx;
+			}
+		}
+
+		sy = im1.sy;
+		if (im1.sy != im2.sy) {
+			cmpStatus |= GdUtils.GD_CMP_SIZE_Y + GdUtils.GD_CMP_IMAGE;
+			if (im2.sy < im1.sy) {
+				sy = im2.sy;
+			}
+		}
+
+		if (im1.colorsTotal != im2.colorsTotal) {
+			cmpStatus |= GdUtils.GD_CMP_NUM_COLORS;
+		}
+
+		for (y = 0; (y < sy); y++) {
+			for (x = 0; (x < sx); x++) {
+				p1 = im1.getPixel(x, y);
+				p2 = im2.getPixel(x, y);
+				if (im1.getRed(p1) != im2.getRed(p2)) {
+					cmpStatus |= GdUtils.GD_CMP_COLOR + GdUtils.GD_CMP_IMAGE;
+					break;
+				}
+				if (im1.getGreen(p1) != im2.getGreen(p2)) {
+					cmpStatus |= GdUtils.GD_CMP_COLOR + GdUtils.GD_CMP_IMAGE;
+					break;
+				}
+				if (im1.getBlue(p1) != im2.getBlue(p2)) {
+					cmpStatus |= GdUtils.GD_CMP_COLOR + GdUtils.GD_CMP_IMAGE;
+					break;
+				}
+			/* Soon we'll add alpha channel to palettes */
+				if (im1.getAlpha(p1) != im2.getAlpha(p2)) {
+					cmpStatus |= GdUtils.GD_CMP_COLOR + GdUtils.GD_CMP_IMAGE;
+					break;
+				}
+			}
+			if ((cmpStatus & GdUtils.GD_CMP_COLOR) != 0) {
+				break;
+			};
+		}
+
+		return cmpStatus;
+	}
+
+
+	public void setAlphaBlending(final GdEffect alphaBlendingArg) {
+		this.alphaBlendingFlag = alphaBlendingArg;
+	}
+
+	public void setSaveAlpha(final int saveAlphaArg) {
+		this.saveAlphaFlag = saveAlphaArg;
+	}
+
+	public void setClip(int x1, int y1, int x2, int y2) {
+		if (x1 < 0) {
+			x1 = 0;
+		}
+		if (x1 >= sx) {
+			x1 = sx - 1;
+		}
+		if (x2 < 0) {
+			x2 = 0;
+		}
+		if (x2 >= sx) {
+			x2 = sx - 1;
+		}
+		if (y1 < 0) {
+			y1 = 0;
+		}
+		if (y1 >= sy) {
+			y1 = sy - 1;
+		}
+		if (y2 < 0) {
+			y2 = 0;
+		}
+		if (y2 >= sy) {
+			y2 = sy - 1;
+		}
+		cx1 = x1;
+		cy1 = y1;
+		cx2 = x2;
+		cy2 = y2;
+	}
+
+	public RectangleClip getClip() {
+		return new RectangleClip(cx1, cy1, cx2, cy2);
+	}
+
+	public void setResolution(final int res_x, final int res_y) {
+		if (res_x > 0) this.res_x = res_x;
+		if (res_y > 0) this.res_y = res_y;
+	}
+
+
+	/* convert a palette image to true color */
+	public void paletteToTrueColor() {
+		int y;
+		int yy;
+
+		if (trueColor) {
+			return;
+		}
+
+		int x;
+		final int sy = this.sy;
+		final int sx = this.sx;
+
+		tpixels = new int[sy][sx];
+
+		for (y = 0; y < sy; y++) {
+			int[] src_row = pixels[y];
+			int[] dst_row = tpixels[y];
+
+			for (x = 0; x < sx; x++) {
+				final int c = src_row[x];
+				if (c == transparent) {
+					dst_row[x] = GdUtils.gdTrueColorAlpha(0, 0, 0, 127);
+				} else {
+					dst_row[x] = GdUtils.gdTrueColorAlpha(red[c], green[c], blue[c], alpha[c]);
+				}
+			}
+		}
+
+		/* free old palette buffer */
+		pixels = null;
+		trueColor = true;
+		alphaBlendingFlag = GdEffect.REPLACE;
+		saveAlphaFlag = 1;
 	}
 
 }

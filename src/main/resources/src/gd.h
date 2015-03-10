@@ -132,8 +132,6 @@ BGD_DECLARE(void) gdImageDashedLine (gdImagePtr im, int x1, int y1, int x2, int 
    second. */
 BGD_DECLARE(void) gdImageRectangle (gdImagePtr im, int x1, int y1, int x2, int y2,
                                     int color);
-BGD_DECLARE(void) gdImageSetClip(gdImagePtr im, int x1, int y1, int x2, int y2);
-BGD_DECLARE(void) gdImageGetClip(gdImagePtr im, int *x1P, int *y1P, int *x2P, int *y2P);
 BGD_DECLARE(void) gdImageSetResolution(gdImagePtr im, const unsigned int res_x, const unsigned int res_y);
 BGD_DECLARE(int) gdImageBoundsSafe (gdImagePtr im, int x, int y);
 BGD_DECLARE(void) gdImageChar (gdImagePtr im, gdFontPtr f, int x, int y, int c,
@@ -311,8 +309,6 @@ BGD_DECLARE(gdImagePtr) gdImageCreatePaletteFromTrueColor (gdImagePtr im, int di
 
 BGD_DECLARE(int) gdImageTrueColorToPalette (gdImagePtr im, int ditherFlag,
 					    int colorsWanted);
-
-BGD_DECLARE(int) gdImagePaletteToTrueColor(gdImagePtr src);
 
 /* An attempt at getting the results of gdImageTrueColorToPalette to
  * look a bit more like the original (im1 is the original and im2 is
@@ -539,19 +535,6 @@ BGD_DECLARE(void) gdImageCopyRotated (gdImagePtr dst,
 
 BGD_DECLARE(gdImagePtr) gdImageClone (gdImagePtr src);
 
-BGD_DECLARE(void) gdImageSetBrush (gdImagePtr im, gdImagePtr brush);
-BGD_DECLARE(void) gdImageSetTile (gdImagePtr im, gdImagePtr tile);
-BGD_DECLARE(void) gdImageSetAntiAliased (gdImagePtr im, int c);
-BGD_DECLARE(void) gdImageSetAntiAliasedDontBlend (gdImagePtr im, int c, int dont_blend);
-BGD_DECLARE(void) gdImageSetStyle (gdImagePtr im, int *style, int noOfPixels);
-/* Line thickness (defaults to 1). Affects lines, ellipses,
-   rectangles, polygons and so forth. */
-BGD_DECLARE(void) gdImageSetThickness (gdImagePtr im, int thickness);
-/* On or off (1 or 0) for all three of these. */
-BGD_DECLARE(void) gdImageInterlace (gdImagePtr im, int interlaceArg);
-BGD_DECLARE(void) gdImageAlphaBlending (gdImagePtr im, int alphaBlendingArg);
-BGD_DECLARE(void) gdImageSaveAlpha (gdImagePtr im, int saveAlphaArg);
-
 BGD_DECLARE(gdImagePtr) gdImageNeuQuant(gdImagePtr im, const int max_color, int sample_factor);
 
 enum gdPixelateMode {
@@ -595,27 +578,9 @@ BGD_DECLARE(gdImagePtr) gdImageCopyGaussianBlurred(gdImagePtr src, int radius,
    zero for a palette image. */
 #define gdImageTrueColor(im) ((im)->trueColor)
 
-#define gdImageSX(im) ((im)->sx)
-#define gdImageSY(im) ((im)->sy)
-#define gdImageColorsTotal(im) ((im)->colorsTotal)
-#define gdImageRed(im, c) ((im)->trueColor ? gdTrueColorGetRed(c) : \
-			   (im)->red[(c)])
-#define gdImageGreen(im, c) ((im)->trueColor ? gdTrueColorGetGreen(c) : \
-			     (im)->green[(c)])
-#define gdImageBlue(im, c) ((im)->trueColor ? gdTrueColorGetBlue(c) : \
-			    (im)->blue[(c)])
-#define gdImageAlpha(im, c) ((im)->trueColor ? gdTrueColorGetAlpha(c) : \
-			     (im)->alpha[(c)])
 #define gdImageGetTransparent(im) ((im)->transparent)
 #define gdImageGetInterlaced(im) ((im)->interlace)
 
-/* These macros provide direct access to pixels in
-   palette-based and truecolor images, respectively.
-   If you use these macros, you must perform your own
-   bounds checking. Use of the macro for the correct type
-   of image is also your responsibility. */
-#define gdImagePalettePixel(im, x, y) (im)->pixels[(y)][(x)]
-#define gdImageTrueColorPixel(im, x, y) (im)->tpixels[(y)][(x)]
 
 #define gdImageResolutionX(im) (im)->res_x
 #define gdImageResolutionY(im) (im)->res_y
@@ -652,8 +617,6 @@ BGD_DECLARE(void *) gdDPExtractData (struct gdIOCtx *ctx, int *size);
 #define GD2_FMT_RAW             1
 #define GD2_FMT_COMPRESSED      2
 
-/* Image comparison definitions */
-BGD_DECLARE(int) gdImageCompare (gdImagePtr im1, gdImagePtr im2);
 
 BGD_DECLARE(void) gdImageFlipHorizontal(gdImagePtr im);
 BGD_DECLARE(void) gdImageFlipVertical(gdImagePtr im);
@@ -697,15 +660,6 @@ gdTransformAffineCopy(gdImagePtr dst, int x0, int y0, int x1, int y1,
 */
 BGD_DECLARE(int) gdTransformAffineBoundingBox(gdRectPtr src, const double affine[6], gdRectPtr bbox);
 
-#define GD_CMP_IMAGE		1	/* Actual image IS different */
-#define GD_CMP_NUM_COLORS	2	/* Number of Colours in pallette differ */
-#define GD_CMP_COLOR		4	/* Image colours differ */
-#define GD_CMP_SIZE_X		8	/* Image width differs */
-#define GD_CMP_SIZE_Y		16	/* Image heights differ */
-#define GD_CMP_TRANSPARENT	32	/* Transparent colour */
-#define GD_CMP_BACKGROUND	64	/* Background colour */
-#define GD_CMP_INTERLACE	128	/* Interlaced setting */
-#define GD_CMP_TRUECOLOR	256	/* Truecolor vs palette differs */
 
 
 

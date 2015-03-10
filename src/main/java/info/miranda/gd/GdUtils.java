@@ -66,7 +66,17 @@ public class GdUtils {
 	public static final int SPECIAL_COLOR_TRANSPARENT = (-6);
 	public static final int SPECIAL_COLOR_ANTI_ALIASED = (-7);
 
-/* For backwards compatibility only. Use gdImageSetStyle()
+	public static final int GD_CMP_IMAGE		= 1;	/* Actual image IS different */
+	public static final int GD_CMP_NUM_COLORS	= 2;	/* Number of Colours in pallette differ */
+	public static final int GD_CMP_COLOR		= 4;	/* Image colours differ */
+	public static final int GD_CMP_SIZE_X		= 8;	/* Image width differs */
+	public static final int GD_CMP_SIZE_Y		= 16;	/* Image heights differ */
+	public static final int GD_CMP_TRANSPARENT	= 32;	/* Transparent colour */
+	public static final int GD_CMP_BACKGROUND	= 64;	/* Background colour */
+	public static final int GD_CMP_INTERLACE	= 128;	/* Interlaced setting */
+	public static final int GD_CMP_TRUECOLOR	= 256;	/* Truecolor vs palette differs */
+
+	/* For backwards compatibility only. Use gdImageSetStyle()
    for MUCH more flexible line drawing. Also see
    gdImageSetBrush(). */
 	public static final int DASH_SIZE = 4;
