@@ -1264,7 +1264,7 @@ public class GdImage {
 	}
 
 	/* Bresenham as presented in Foley & Van Dam */
-	public void gdImageLine(final int x1, final int y1, final int x2, final int y2, final int color) {
+	public void gdImageLine(int x1, int y1, int x2, int y2, final int color) {
 		int dx, dy, incr1, incr2, d, x, y, xend, yend, xdirflag, ydirflag;
 		int wid;
 		int w, wstart;
@@ -1284,13 +1284,21 @@ public class GdImage {
 	   is used for actual drawing, but this is still more efficient and opens
 	   the way to skip per-pixel bounds checking in the future. */
 
-		final RecClip clip1 = new RecClip(x1, y1, x2, y2);
-		if (clip_1d(clip1, cx1, cx2) == 0)
+		final RectangleClip clip1 = new RectangleClip(x1, y1, x2, y2);
+		if (clip1.clip_1d(cx1, cx2) == 0)
 			return;
+		x1 = clip1.x0;
+		y1 = clip1.y0;
+		x2 = clip1.x1;
+		y2 = clip1.y1;
 
-		final RecClip clip2 = new RecClip(y1, x1, y2, x2);
-		if (clip_1d(clip2, cy1, cy2) == 0)
+		final RectangleClip clip2 = new RectangleClip(y1, x1, y2, x2);
+		if (clip2.clip_1d(cy1, cy2) == 0)
 			return;
+		y1 = clip2.x0;
+		x1 = clip2.y0;
+		y2 = clip2.x1;
+		x2 = clip2.y1;
 
 		dx = Math.abs(x2 - x1);
 		dy = Math.abs(y2 - y1);
@@ -1431,15 +1439,15 @@ public class GdImage {
 		}
 	}
 
-	class RecClip {
+	class RectangleClip {
 		int x0, y0, x1, y1;
-		RecClip(final int x0, final int y0, final int x1, final int y1) {
+		RectangleClip(final int x0, final int y0, final int x1, final int y1) {
 			this.x0 = x0;
 			this.y0 = y0;
 			this.x1 = x1;
 			this.y1 = y1;
 		}
-	}
+
 
 /* 2.0.10: before the drawing routines, some code to clip points that are
  * outside the drawing window.  Nick Atty (nick@canalplan.org.uk)
@@ -1463,57 +1471,58 @@ public class GdImage {
 /* 2.0.26, TBB: we now have to respect a clipping rectangle, it won't
 	necessarily start at 0. */
 
-	private int clip_1d(final RecClip clip, final int mindim, final int maxdim)
-	{
-		double m;			/* gradient of line */
-		if (clip.x0 < mindim) {
+		private int clip_1d(final int mindim, final int maxdim)
+		{
+			double m;			/* gradient of line */
+			if (x0 < mindim) {
 		/* start of line is left of window */
-		if (clip.x1 < mindim)		/* as is the end, so the line never cuts the window */
-		return 0;
-		m = (clip.y1 - clip.y0) / (double) (clip.x1 - clip.x0);	/* calculate the slope of the line */
+				if (x1 < mindim)		/* as is the end, so the line never cuts the window */
+					return 0;
+				m = (y1 - y0) / (double) (x1 - x0);	/* calculate the slope of the line */
 		/* adjust x0 to be on the left boundary (ie to be zero), and y0 to match */
-		clip.y0 -= (int)(m * (clip.x0 - mindim));
-		clip.x0 = mindim;
+				y0 -= (int)(m * (x0 - mindim));
+				x0 = mindim;
 		/* now, perhaps, adjust the far end of the line as well */
-		if (clip.x1 > maxdim) {
-			clip.y1 += m * (maxdim - clip.x1);
-			clip.x1 = maxdim;
-		}
-		return 1;
-	}
-		if (clip.x0 > maxdim) {
+				if (x1 > maxdim) {
+					y1 += m * (maxdim - x1);
+					x1 = maxdim;
+				}
+				return 1;
+			}
+			if (x0 > maxdim) {
 		/* start of line is right of window -
 		complement of above */
-		if (clip.x1 > maxdim)		/* as is the end, so the line misses the window */
-		return 0;
-		m = (clip.y1 - clip.y0) / (double) (clip.x1 - clip.x0);	/* calculate the slope of the line */
-		clip.y0 += (int)(m * (maxdim - clip.x0));	/* adjust so point is on the right
+				if (x1 > maxdim)		/* as is the end, so the line misses the window */
+					return 0;
+				m = (y1 - y0) / (double) (x1 - x0);	/* calculate the slope of the line */
+				y0 += (int)(m * (maxdim - x0));	/* adjust so point is on the right
 							   boundary */
-		clip.x0 = maxdim;
+				x0 = maxdim;
 		/* now, perhaps, adjust the end of the line */
-		if (clip.x1 < mindim) {
-			clip.y1 -= (int)(m * (clip.x1 - mindim));
-			clip.x1 = mindim;
-		}
-		return 1;
-	}
+				if (x1 < mindim) {
+					y1 -= (int)(m * (x1 - mindim));
+					x1 = mindim;
+				}
+				return 1;
+			}
 	/* the final case - the start of the line is inside the window */
-		if (clip.x1 > maxdim) {
+			if (x1 > maxdim) {
 		/* other end is outside to the right */
-		m = (clip.y1 - clip.y0) / (double) (clip.x1 - clip.x0);	/* calculate the slope of the line */
-		clip.y1 += (int)(m * (maxdim - clip.x1));
-		clip.x1 = maxdim;
-		return 1;
-	}
-		if (clip.x1 < mindim) {
+				m = (y1 - y0) / (double) (x1 - x0);	/* calculate the slope of the line */
+				y1 += (int)(m * (maxdim - x1));
+				x1 = maxdim;
+				return 1;
+			}
+			if (x1 < mindim) {
 		/* other end is outside to the left */
-		m = (clip.y1 - clip.y0) / (double) (clip.x1 - clip.x0);	/* calculate the slope of the line */
-		clip.y1 -= (int)(m * (clip.x1 - mindim));
-		clip.x1 = mindim;
-		return 1;
-	}
+				m = (y1 - y0) / (double) (x1 - x0);	/* calculate the slope of the line */
+				y1 -= (int)(m * (x1 - mindim));
+				x1 = mindim;
+				return 1;
+			}
 	/* only get here if both points are inside the window */
-		return 1;
+			return 1;
+		}
 	}
 
 	private void gdImageVLine(final int x, int y1, int y2, final int col) {
@@ -1567,13 +1576,21 @@ public class GdImage {
 		}
 
 	/* TBB: use the clipping rectangle */
-		final RecClip clip1 = new RecClip(x1, y1, x2, y2);
-		if (clip_1d(clip1, cx1, cx2) == 0)
+		final RectangleClip clip1 = new RectangleClip(x1, y1, x2, y2);
+		if (clip1.clip_1d(cx1, cx2) == 0)
 			return;
+		x1 = clip1.x0;
+		y1 = clip1.y0;
+		x2 = clip1.x1;
+		y2 = clip1.y1;
 
-		final RecClip clip2 = new RecClip(y1, x1, y2, x2);
-		if (clip_1d(clip2, cy1, cy2) == 0)
+		final RectangleClip clip2 = new RectangleClip(y1, x1, y2, x2);
+		if (clip2.clip_1d(cy1, cy2) == 0)
 			return;
+		y1 = clip2.x0;
+		x1 = clip2.y0;
+		y2 = clip2.x1;
+		x2 = clip2.y1;
 
 		dx = x2 - x1;
 		dy = y2 - y1;
