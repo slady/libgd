@@ -1,24 +1,7 @@
 package info.miranda.gd;
 
 /*
-   Group: Types
-
-   typedef: gdImage
-
-   typedef: gdImagePtr
-
-   The data structure in which gd stores images. <gdImageCreate>,
-   <gdImageCreateTrueColor> and the various image file-loading functions
-   return a pointer to this type, and the other functions expect to
-   receive a pointer to this type as their first argument.
-
-   *gdImagePtr* is a pointer to *gdImage*.
-
-   (Previous versions of this library encouraged directly manipulating
-   the contents ofthe struct but we are attempting to move away from
-   this practice so the fields are no longer documented here.  If you
-   need to poke at the internals of this struct, feel free to look at
-   *gd.h*.)
+   The data structure in which gd stores images.
 */
 public class GdImage {
 	/* Palette-based image pixels */
@@ -36,7 +19,7 @@ public class GdImage {
 	/* For backwards compatibility, this is set to the
 	   first palette entry with 100% transparency,
 	   and is also set and reset by the
-	   gdImageColorTransparent function. Newer
+	   colorTransparent function. Newer
 	   applications can allocate palette entries
 	   with any desired level of transparency; however,
 	   bear in mind that many viewers, notably
@@ -92,7 +75,7 @@ public class GdImage {
 
 	/* 2.0.12: simple clipping rectangle. These values
 	  must be checked for safety when set; please use
-	  gdImageSetClip */
+	  setClip */
 	int cx1;
 	int cy1;
 	int cx2;
@@ -102,7 +85,7 @@ public class GdImage {
 	int res_x;
 	int res_y;
 
-	/* Selects quantization method, see gdImageTrueColorToPaletteSetMethod() and gdPaletteQuantizationMethod enum. */
+	/* Selects quantization method, see trueColorToPaletteSetMethod() and gdPaletteQuantizationMethod enum. */
 	int paletteQuantizationMethod;
 	/* speed/quality trade-off. 1 = best quality, 10 = best speed. 0 = method-specific default.
 	   Applicable to GD_QUANT_LIQ and GD_QUANT_NEUQUANT. */
@@ -850,7 +833,7 @@ public class GdImage {
 	/**
 	 * @param sx The image width.
 	 * @param sy The image height.
-	 * @param colorType GdImageColorType image color type, either pallete or true color.
+	 * @param colorType image color type, either palette or true color.
 	 */
 	public GdImage(final int sx, final int sy, final GdImageColorType colorType) {
 		pixels = new int[sy][sx];
@@ -1018,12 +1001,12 @@ public class GdImage {
 
 
 	/* Replaces or blends with the background depending on the
-	   most recent call to gdImageAlphaBlending and the
+	   most recent call to alphaBlending and the
 	   alpha channel value of 'color'; default is to overwrite.
 	   Tiling and line styling are also implemented
 	   here. All other gd drawing functions pass through this call,
 	   allowing for many useful effects.
-	   Overlay and multiply effects are used when gdImageAlphaBlending
+	   Overlay and multiply effects are used when alphaBlending
 	   is passed gdEffectOverlay and gdEffectMultiply */
 	public void setPixel(final int x, final int y, final int color) {
 		int p;
@@ -1059,7 +1042,7 @@ public class GdImage {
 				break;
 			case GdUtils.SPECIAL_COLOR_ANTI_ALIASED:
 		/* This shouldn't happen (2.0.26) because we just call
-		  gdImageAALine now, but do something sane. */
+		  AALine now, but do something sane. */
 				setPixel(x, y, AA_color);
 				break;
 			default:
@@ -1199,17 +1182,17 @@ public class GdImage {
 
 
 /*
- * gdImageColorResolve is an alternative for the code fragment:
+ * colorResolve is an alternative for the code fragment:
  *
- *      if ((color=gdImageColorExact(im,R,G,B)) < 0)
- *        if ((color=gdImageColorAllocate(im,R,G,B)) < 0)
- *          color=gdImageColorClosest(im,R,G,B);
+ *      if ((color=colorExact(im,R,G,B)) < 0)
+ *        if ((color=colorAllocate(im,R,G,B)) < 0)
+ *          color=colorClosest(im,R,G,B);
  *
  * in a single function.    Its advantage is that it is guaranteed to
  * return a color index in one search over the color table.
  */
 
-	private int gdImageColorResolve(int r, int g, int b) {
+	private int colorResolve(int r, int g, int b) {
 		return colorResolveAlpha(r, g, b, GdUtils.ALPHA_OPAQUE);
 	}
 
@@ -1272,7 +1255,7 @@ public class GdImage {
 		if (color == GdUtils.SPECIAL_COLOR_ANTI_ALIASED) {
 		/*
 		  gdAntiAliased passed as color: use the much faster, much cheaper
-		  and equally attractive gdImageAALine implementation. That
+		  and equally attractive AALine implementation. That
 		  clips too, so don't clip twice.
 		*/
 			AALine(x1, y1, x2, y2, AA_color);
@@ -1280,7 +1263,7 @@ public class GdImage {
 		}
 	/* 2.0.10: Nick Atty: clip to edges of drawing rectangle, return if no
 	   points need to be drawn. 2.0.26, TBB: clip to edges of clipping
-	   rectangle. We were getting away with this because gdImageSetPixel
+	   rectangle. We were getting away with this because setPixel
 	   is used for actual drawing, but this is still more efficient and opens
 	   the way to skip per-pixel bounds checking in the future. */
 
