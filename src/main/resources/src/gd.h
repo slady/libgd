@@ -258,10 +258,6 @@ BGD_DECLARE(char *) gdImageStringFTEx (gdImage * im, int *brect, int fg, char *f
                                        double ptsize, double angle, int x, int y,
                                        char *string, gdFTStringExtraPtr strex);
 
-BGD_DECLARE(void) gdImagePolygon (gdImagePtr im, gdPointPtr p, int n, int c);
-BGD_DECLARE(void) gdImageOpenPolygon (gdImagePtr im, gdPointPtr p, int n, int c);
-BGD_DECLARE(void) gdImageFilledPolygon (gdImagePtr im, gdPointPtr p, int n, int c);
-
 /* These functions still work with truecolor images,
    for which they never return error. */
 BGD_DECLARE(int) gdImageColorAllocate (gdImagePtr im, int r, int g, int b);
