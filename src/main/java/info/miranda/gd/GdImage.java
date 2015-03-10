@@ -843,7 +843,7 @@ public class GdImage {
 	};
 
 	/* 2.0.12: this now checks the clipping rectangle */
-	private boolean gdImageBoundsSafeMacro(final int x, final int y) {
+	private boolean boundsSafeMacro(final int x, final int y) {
 		return (!(((y < cy1) || (y > cy2)) || ((x < cx1) || (x > cx2))));
 	}
 
@@ -895,7 +895,7 @@ public class GdImage {
 	}
 
 	public int getPixel(final int x, final int y) {
-		if (gdImageBoundsSafeMacro(x, y)) {
+		if (boundsSafeMacro(x, y)) {
 			if (trueColor) {
 				return tpixels[y][x];
 			} else {
@@ -1052,10 +1052,10 @@ public class GdImage {
 				stylePos = stylePos % styleLength;
 				break;
 			case GdUtils.SPECIAL_COLOR_BRUSHED:
-				gdImageBrushApply(x, y);
+				brushApply(x, y);
 				break;
 			case GdUtils.SPECIAL_COLOR_TILED:
-				gdImageTileApply(x, y);
+				tileApply(x, y);
 				break;
 			case GdUtils.SPECIAL_COLOR_ANTI_ALIASED:
 		/* This shouldn't happen (2.0.26) because we just call
@@ -1063,7 +1063,7 @@ public class GdImage {
 				setPixel(x, y, AA_color);
 				break;
 			default:
-				if (gdImageBoundsSafeMacro(x, y)) {
+				if (boundsSafeMacro(x, y)) {
 					if (trueColor) {
 						switch (alphaBlendingFlag) {
 							default:
@@ -1089,7 +1089,7 @@ public class GdImage {
 		}
 	}
 
-	private void gdImageBrushApply(final int x, final int y) {
+	private void brushApply(final int x, final int y) {
 		int x1, y1, x2, y2;
 		int srcx, srcy;
 		if (brush == null) {
@@ -1145,7 +1145,7 @@ public class GdImage {
 					   on a palette destination. */
 						if (brush.trueColor) {
 							setPixel(lx, ly,
-									gdImageColorResolveAlpha(
+									colorResolveAlpha(
 											GdUtils.gdTrueColorGetRed(p),
 											GdUtils.gdTrueColorGetGreen(p),
 											GdUtils.gdTrueColorGetBlue(p),
@@ -1161,7 +1161,7 @@ public class GdImage {
 		}
 	}
 
-	void gdImageTileApply(int x, int y) {
+	void tileApply(int x, int y) {
 		int srcx, srcy;
 		int p;
 		if (tile == null) {
@@ -1185,7 +1185,7 @@ public class GdImage {
 				/* Truecolor tile. Very slow
 				   on a palette destination. */
 					setPixel(x, y,
-							gdImageColorResolveAlpha(
+							colorResolveAlpha(
 									GdUtils.gdTrueColorGetRed(p),
 									GdUtils.gdTrueColorGetGreen(p),
 									GdUtils.gdTrueColorGetBlue(p),
@@ -1210,10 +1210,10 @@ public class GdImage {
  */
 
 	private int gdImageColorResolve(int r, int g, int b) {
-		return gdImageColorResolveAlpha(r, g, b, GdUtils.ALPHA_OPAQUE);
+		return colorResolveAlpha(r, g, b, GdUtils.ALPHA_OPAQUE);
 	}
 
-	private int gdImageColorResolveAlpha(int r, int g, int b, int a) {
+	private int colorResolveAlpha(int r, int g, int b, int a) {
 		int c;
 		int ct = -1;
 		int op = -1;
@@ -1264,7 +1264,7 @@ public class GdImage {
 	}
 
 	/* Bresenham as presented in Foley & Van Dam */
-	public void gdImageLine(int x1, int y1, int x2, int y2, final int color) {
+	public void line(int x1, int y1, int x2, int y2, final int color) {
 		int dx, dy, incr1, incr2, d, x, y, xend, yend, xdirflag, ydirflag;
 		int wid;
 		int w, wstart;
@@ -1275,7 +1275,7 @@ public class GdImage {
 		  and equally attractive gdImageAALine implementation. That
 		  clips too, so don't clip twice.
 		*/
-			gdImageAALine(x1, y1, x2, y2, AA_color);
+			AALine(x1, y1, x2, y2, AA_color);
 			return;
 		}
 	/* 2.0.10: Nick Atty: clip to edges of drawing rectangle, return if no
@@ -1304,10 +1304,10 @@ public class GdImage {
 		dy = Math.abs(y2 - y1);
 
 		if (dx == 0) {
-			gdImageVLine(x1, y1, y2, color);
+			vLine(x1, y1, y2, color);
 			return;
 		} else if (dy == 0) {
-			gdImageHLine(y1, x1, x2, color);
+			hLine(y1, x1, x2, color);
 			return;
 		}
 
@@ -1525,10 +1525,10 @@ public class GdImage {
 		}
 	}
 
-	private void gdImageVLine(final int x, int y1, int y2, final int col) {
+	private void vLine(final int x, int y1, int y2, final int col) {
 		if (thick > 1) {
 			int thickhalf = thick >> 1;
-			gdImageFilledRectangle(x - thickhalf, y1, x + thick - thickhalf - 1, y2, col);
+			filledRectangle(x - thickhalf, y1, x + thick - thickhalf - 1, y2, col);
 		} else {
 			if (y2 < y1) {
 				int t = y1;
@@ -1543,11 +1543,11 @@ public class GdImage {
 		return;
 	}
 
-	private void gdImageHLine(int y, int x1, int x2, final int col)
+	private void hLine(int y, int x1, int x2, final int col)
 	{
 		if (thick > 1) {
 			int thickhalf = thick >> 1;
-			gdImageFilledRectangle(x1, y - thickhalf, x2, y + thick - thickhalf - 1, col);
+			filledRectangle(x1, y - thickhalf, x2, y + thick - thickhalf - 1, col);
 		} else {
 			if (x2 < x1) {
 				int t = x2;
@@ -1563,7 +1563,7 @@ public class GdImage {
 	}
 
 
-	private void gdImageAALine(int x1, int y1, int x2, int y2, final int col) {
+	private void AALine(int x1, int y1, int x2, int y2, final int col) {
 	/* keep them as 32bits */
 		long x, y, inc, frac;
 		long dx, dy,tmp;
@@ -1571,7 +1571,7 @@ public class GdImage {
 
 		if (!trueColor) {
 		/* TBB: don't crash when the image is of the wrong type */
-			gdImageLine(x1, y1, x2, y2, col);
+			line(x1, y1, x2, y2, col);
 			return;
 		}
 
@@ -1597,7 +1597,7 @@ public class GdImage {
 
 		if (dx == 0 && dy == 0) {
 		/* TBB: allow setting points */
-			gdImageSetAAPixelColor(x1, y1, col, 0xFF);
+			setAAPixelColor(x1, y1, col, 0xFF);
 			return;
 		} else {
 			double ag;
@@ -1614,10 +1614,10 @@ public class GdImage {
 
 	/* Axis aligned lines */
 		if (dx == 0) {
-			gdImageVLine(x1, y1, y2, col);
+			vLine(x1, y1, y2, col);
 			return;
 		} else if (dy == 0) {
-			gdImageHLine(y1, x1, x2, col);
+			hLine(y1, x1, x2, col);
 			return;
 		}
 
@@ -1639,8 +1639,8 @@ public class GdImage {
 			for (x = x1 ; x <= x2 ; x++) {
 				wstart = (int) (y - wid / 2);
 				for (w = wstart; w < wstart + wid; w++) {
-					gdImageSetAAPixelColor((int) x, w, col, (int) ((frac >> 8) & 0xFF));
-					gdImageSetAAPixelColor((int) x, w + 1, col, (int) ((~frac >> 8) & 0xFF));
+					setAAPixelColor((int) x, w, col, (int) ((frac >> 8) & 0xFF));
+					setAAPixelColor((int) x, w + 1, col, (int) ((~frac >> 8) & 0xFF));
 				}
 				frac += inc;
 				if (frac >= 65536) {
@@ -1669,8 +1669,8 @@ public class GdImage {
 			for (y = y1 ; y <= y2 ; y++) {
 				wstart = (int) (x - wid / 2);
 				for (w = wstart; w < wstart + wid; w++) {
-					gdImageSetAAPixelColor(w, (int) y, col, (int) ((frac >> 8) & 0xFF));
-					gdImageSetAAPixelColor(w + 1, (int) y, col, (int) ((~frac >> 8) & 0xFF));
+					setAAPixelColor(w, (int) y, col, (int) ((frac >> 8) & 0xFF));
+					setAAPixelColor(w + 1, (int) y, col, (int) ((~frac >> 8) & 0xFF));
 				}
 				frac += inc;
 				if (frac >= 65536) {
@@ -1684,11 +1684,11 @@ public class GdImage {
 		}
 	}
 
-	private void gdImageSetAAPixelColor(final int x, final int y, final int color, final int t) {
+	private void setAAPixelColor(final int x, final int y, final int color, final int t) {
 		int dr,dg,db,p,r,g,b;
 
 	/* 2.0.34: watch out for out of range calls */
-		if (!gdImageBoundsSafeMacro(x, y)) {
+		if (!boundsSafeMacro(x, y)) {
 			return;
 		}
 		p = getPixel(x, y);
@@ -1721,7 +1721,7 @@ public class GdImage {
 	}
 
 	/* Solid bar. Upper left corner first, lower right corner second. */
-	public void gdImageFilledRectangle (int x1, int y1, int x2, int y2, final int color) {
+	public void filledRectangle(int x1, int y1, int x2, int y2, final int color) {
 		int x, y;
 
 		if (x1 == x2 && y1 == y2) {
