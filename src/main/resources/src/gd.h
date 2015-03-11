@@ -261,13 +261,6 @@ BGD_DECLARE(char *) gdImageStringFTEx (gdImage * im, int *brect, int fg, char *f
 BGD_DECLARE(int) gdImageColorAllocate (gdImagePtr im, int r, int g, int b);
 /* gd 2.0: palette entries with non-opaque transparency are permitted. */
 BGD_DECLARE(int) gdImageColorAllocateAlpha (gdImagePtr im, int r, int g, int b, int a);
-/* Assumes opaque is the preferred alpha channel value */
-BGD_DECLARE(int) gdImageColorClosest (gdImagePtr im, int r, int g, int b);
-/* Closest match taking all four parameters into account.
-   A slightly different color with the same transparency
-   beats the exact same color with radically different
-   transparency */
-BGD_DECLARE(int) gdImageColorClosestAlpha (gdImagePtr im, int r, int g, int b, int a);
 /* An alternate method */
 BGD_DECLARE(int) gdImageColorClosestHWB (gdImagePtr im, int r, int g, int b);
 /* Returns exact, 100% opaque matches only */

@@ -1392,4 +1392,44 @@ public class GdImage {
 		saveAlphaFlag = 1;
 	}
 
+	/* Assumes opaque is the preferred alpha channel value */
+	public int gdImageColorClosest(final int r, final int g, final int b) {
+		return gdImageColorClosestAlpha(r, g, b, GdUtils.ALPHA_OPAQUE);
+	}
+
+	/* Closest match taking all four parameters into account.
+	   A slightly different color with the same transparency
+	   beats the exact same color with radically different
+	   transparency */
+	public int gdImageColorClosestAlpha(final int r, final int g, final int b, final int a) {
+		int i;
+		long rd, gd, bd, ad;
+		int ct = (-1);
+		boolean first = true;
+		long mindist = 0;
+		if (trueColor) {
+			return GdUtils.gdTrueColorAlpha(r, g, b, a);
+		}
+		for (i = 0; (i < (colorsTotal)); i++) {
+			long dist;
+			if (open[i]) {
+				continue;
+			}
+			rd = (red[i] - r);
+			gd = (green[i] - g);
+			bd = (blue[i] - b);
+		/* gd 2.02: whoops, was - b (thanks to David Marwood) */
+		/* gd 2.16: was blue rather than alpha! Geez! Thanks to
+		   Artur Jakub Jerzak */
+			ad = (alpha[i] - a);
+			dist = rd * rd + gd * gd + bd * bd + ad * ad;
+			if (first || (dist < mindist)) {
+				mindist = dist;
+				ct = i;
+				first = false;
+			}
+		}
+		return ct;
+	}
+
 }
