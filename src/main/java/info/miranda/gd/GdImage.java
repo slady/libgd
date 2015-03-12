@@ -522,7 +522,7 @@ public class GdImage {
 	}
 
 	/* Bresenham as presented in Foley & Van Dam */
-	public void line(int x1, int y1, int x2, int y2, final int color) {
+	public void drawLine(int x1, int y1, int x2, int y2, final int color) {
 		int dx, dy, incr1, incr2, d, x, y, xend, yend, xdirflag, ydirflag;
 		int wid;
 		int w, wstart;
@@ -700,7 +700,7 @@ public class GdImage {
 	private void vLine(final int x, int y1, int y2, final int col) {
 		if (thick > 1) {
 			int thickhalf = thick >> 1;
-			filledRectangle(x - thickhalf, y1, x + thick - thickhalf - 1, y2, col);
+			fillRectangle(x - thickhalf, y1, x + thick - thickhalf - 1, y2, col);
 		} else {
 			if (y2 < y1) {
 				int t = y1;
@@ -719,7 +719,7 @@ public class GdImage {
 	{
 		if (thick > 1) {
 			int thickhalf = thick >> 1;
-			filledRectangle(x1, y - thickhalf, x2, y + thick - thickhalf - 1, col);
+			fillRectangle(x1, y - thickhalf, x2, y + thick - thickhalf - 1, col);
 		} else {
 			if (x2 < x1) {
 				int t = x2;
@@ -743,7 +743,7 @@ public class GdImage {
 
 		if (!trueColor) {
 		/* TBB: don't crash when the image is of the wrong type */
-			line(x1, y1, x2, y2, col);
+			drawLine(x1, y1, x2, y2, col);
 			return;
 		}
 
@@ -893,7 +893,7 @@ public class GdImage {
 	}
 
 	/* Solid bar. Upper left corner first, lower right corner second. */
-	public void filledRectangle(int x1, int y1, int x2, int y2, final int color) {
+	public void fillRectangle(int x1, int y1, int x2, int y2, final int color) {
 		int x, y;
 
 		if (x1 == x2 && y1 == y2) {
@@ -936,19 +936,19 @@ public class GdImage {
 		}
 	}
 
-	public void polygon(final GdPoint[] p, final int c) {
-		line(p[0].x, p[0].y, p[p.length - 1].x, p[p.length - 1].y, c);
-		openPolygon(p, c);
+	public void drawPolygon(final GdPoint[] p, final int c) {
+		drawLine(p[0].x, p[0].y, p[p.length - 1].x, p[p.length - 1].y, c);
+		drawOpenPolygon(p, c);
 	}
 
-	public void openPolygon(final GdPoint[] p, final int c) {
+	public void drawOpenPolygon(final GdPoint[] p, final int c) {
 		int i;
 		int lx, ly;
 
 		lx = p[0].x;
 		ly = p[0].y;
 		for (i = 1; (i < p.length); i++) {
-			line(lx, ly, p[i].x, p[i].y, c);
+			drawLine(lx, ly, p[i].x, p[i].y, c);
 			lx = p[i].x;
 			ly = p[i].y;
 		}
@@ -961,8 +961,7 @@ public class GdImage {
 /* by remembering the previous intersection, and by using the slope. */
 /* That could help to adjust intersections  to produce a nice */
 /* interior_extrema. */
-
-	public void filledPolygon(final GdPoint[] p, final int c) {
+	public void fillPolygon(final GdPoint[] p, final int c) {
 		int i;
 		int j;
 		int index;
@@ -1062,14 +1061,14 @@ public class GdImage {
 			for (i = 0; (i < (ints-1)); i += 2) {
 			/* 2.0.29: back to line to prevent segfaults when
 			  performing a pattern fill */
-				line(polyInts[i], y, polyInts[i + 1], y,
+				drawLine(polyInts[i], y, polyInts[i + 1], y,
 						fill_color);
 			}
 		}
 	/* If we are drawing this AA, then redraw the border with AA lines. */
 	/* This doesn't work as well as I'd like, but it doesn't clash either. */
 		if (c == GdUtils.SPECIAL_COLOR_ANTI_ALIASED) {
-			polygon(p, c);
+			drawPolygon(p, c);
 		}
 	}
 
@@ -1307,15 +1306,15 @@ public class GdImage {
 	}
 
 	/* Assumes opaque is the preferred alpha channel value */
-	public int gdImageColorClosest(final int r, final int g, final int b) {
-		return gdImageColorClosestAlpha(r, g, b, GdUtils.ALPHA_OPAQUE);
+	public int findColorClosest(final int r, final int g, final int b) {
+		return findColorClosestAlpha(r, g, b, GdUtils.ALPHA_OPAQUE);
 	}
 
 	/* Closest match taking all four parameters into account.
 	   A slightly different color with the same transparency
 	   beats the exact same color with radically different
 	   transparency */
-	public int gdImageColorClosestAlpha(final int r, final int g, final int b, final int a) {
+	public int findColorClosestAlpha(final int r, final int g, final int b, final int a) {
 		int i;
 		long rd, gd, bd, ad;
 		int ct = (-1);
