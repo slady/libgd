@@ -1,13 +1,12 @@
 package info.miranda.gd;
 
-import junit.framework.TestCase;
 import org.junit.Test;
 
 import static junit.framework.Assert.assertNull;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertEquals;
 
-public class GdColorMapTest extends TestCase {
+public class GdColorMapTest {
 
 	@Test
 	public void testLookupAliceBlue() throws Exception {
