@@ -807,32 +807,32 @@ public class GdUtils {
 			-17
 	};
 
-	public static int getTrueColorAlpha(final int c) {
+	public static int trueColorGetAlpha(final int c) {
 		return (((c) & 0x7F000000) >> 24);
 	}
 
-	public static int getTrueColorRed(final int c) {
+	public static int trueColorGetRed(final int c) {
 		return (((c) & 0xFF0000) >> 16);
 	}
 
-	public static int getTrueColorGreen(final int c) {
+	public static int trueColorGetGreen(final int c) {
 		return (((c) & 0x00FF00) >> 8);
 	}
 
-	public static int getTrueColorBlue(final int c) {
+	public static int trueColorGetBlue(final int c) {
 		return ((c) & 0x0000FF);
 	}
 
 /* A simpler way to obtain an opaque truecolor value for drawing on a
    truecolor image. Not for use with palette images! */
-	public static int getTrueColor(final int r, final int g, final int b) {
+	public static int trueColorMix(final int r, final int g, final int b) {
 		return (((r) << 16) + ((g) << 8) + (b));
 	}
 
 /* Returns a truecolor value with an alpha channel component.
    ALPHA_MAX (127, **NOT 255**) is transparent, 0 is completely
    opaque. */
-	public static int getTrueColorAlpha(final int r, final int g, final int b, final int a) {
+	public static int trueColorMixAlpha(final int r, final int g, final int b, final int a) {
 		return (((a) << 24) + ((r) << 16) + ((g) << 8) + (b));
 	}
 

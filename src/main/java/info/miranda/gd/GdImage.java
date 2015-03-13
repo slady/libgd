@@ -171,7 +171,7 @@ public class GdImage {
 	public int getTrueColorPixel(final int x, final int y) {
 		int p = getPixel(x, y);
 		if (!trueColor) {
-			return GdUtils.getTrueColorAlpha(red[p], green[p], blue[p],
+			return GdUtils.trueColorMixAlpha(red[p], green[p], blue[p],
 					(transparent == p) ? GdUtils.ALPHA_TRANSPARENT : alpha[p]);
 		} else {
 			return p;
@@ -188,7 +188,7 @@ public class GdImage {
 	destination color much better. */
 
 	private int gdAlphaBlend(final int dst, final int src) {
-		int src_alpha = GdUtils.getTrueColorAlpha(src);
+		int src_alpha = GdUtils.trueColorGetAlpha(src);
 		int dst_alpha, alpha, red, green, blue;
 		int src_weight, dst_weight, tot_weight;
 
@@ -198,7 +198,7 @@ public class GdImage {
 		if (src_alpha == GdUtils.ALPHA_OPAQUE)
 			return src;
 
-		dst_alpha = GdUtils.getTrueColorAlpha(dst);
+		dst_alpha = GdUtils.trueColorGetAlpha(dst);
 		if (src_alpha == GdUtils.ALPHA_TRANSPARENT)
 			return dst;
 		if (dst_alpha == GdUtils.ALPHA_TRANSPARENT)
@@ -218,12 +218,12 @@ public class GdImage {
 	/* -------------------------------------------------------------------- */
 		alpha = src_alpha * dst_alpha / GdUtils.ALPHA_MAX;
 
-		red = (GdUtils.getTrueColorRed(src) * src_weight
-				+ GdUtils.getTrueColorRed(dst) * dst_weight) / tot_weight;
-		green = (GdUtils.getTrueColorGreen(src) * src_weight
-				+ GdUtils.getTrueColorGreen(dst) * dst_weight) / tot_weight;
-		blue = (GdUtils.getTrueColorBlue(src) * src_weight
-				+ GdUtils.getTrueColorBlue(dst) * dst_weight) / tot_weight;
+		red = (GdUtils.trueColorGetRed(src) * src_weight
+				+ GdUtils.trueColorGetRed(dst) * dst_weight) / tot_weight;
+		green = (GdUtils.trueColorGetGreen(src) * src_weight
+				+ GdUtils.trueColorGetGreen(dst) * dst_weight) / tot_weight;
+		blue = (GdUtils.trueColorGetBlue(src) * src_weight
+				+ GdUtils.trueColorGetBlue(dst) * dst_weight) / tot_weight;
 
 	/* -------------------------------------------------------------------- */
 	/*      Return merged result.                                           */
@@ -233,15 +233,15 @@ public class GdImage {
 
 	private int gdLayerOverlay(final int dst, final int src) {
 		int a1, a2;
-		a1 = GdUtils.ALPHA_MAX - GdUtils.getTrueColorAlpha(dst);
-		a2 = GdUtils.ALPHA_MAX - GdUtils.getTrueColorAlpha(src);
+		a1 = GdUtils.ALPHA_MAX - GdUtils.trueColorGetAlpha(dst);
+		a2 = GdUtils.ALPHA_MAX - GdUtils.trueColorGetAlpha(src);
 		return (((GdUtils.ALPHA_MAX - a1 * a2 / GdUtils.ALPHA_MAX) << 24) +
-				(gdAlphaOverlayColor(GdUtils.getTrueColorRed(src),
-						GdUtils.getTrueColorRed(dst), GdUtils.RED_MAX) << 16) +
-				(gdAlphaOverlayColor(GdUtils.getTrueColorGreen(src),
-						GdUtils.getTrueColorGreen(dst), GdUtils.GREEN_MAX) << 8) +
-				(gdAlphaOverlayColor(GdUtils.getTrueColorBlue(src),
-						GdUtils.getTrueColorBlue(dst), GdUtils.BLUE_MAX)));
+				(gdAlphaOverlayColor(GdUtils.trueColorGetRed(src),
+						GdUtils.trueColorGetRed(dst), GdUtils.RED_MAX) << 16) +
+				(gdAlphaOverlayColor(GdUtils.trueColorGetGreen(src),
+						GdUtils.trueColorGetGreen(dst), GdUtils.GREEN_MAX) << 8) +
+				(gdAlphaOverlayColor(GdUtils.trueColorGetBlue(src),
+						GdUtils.trueColorGetBlue(dst), GdUtils.BLUE_MAX)));
 	}
 
 	/* Apply 'overlay' effect - background pixels are colourised by the foreground colour */
@@ -260,15 +260,15 @@ public class GdImage {
 	/* Apply 'multiply' effect */
 	private int gdLayerMultiply(final int dst, final int src) {
 		int a1, a2, r1, r2, g1, g2, b1, b2;
-		a1 = GdUtils.ALPHA_MAX - GdUtils.getTrueColorAlpha(src);
-		a2 = GdUtils.ALPHA_MAX - GdUtils.getTrueColorAlpha(dst);
+		a1 = GdUtils.ALPHA_MAX - GdUtils.trueColorGetAlpha(src);
+		a2 = GdUtils.ALPHA_MAX - GdUtils.trueColorGetAlpha(dst);
 
-		r1 = GdUtils.RED_MAX - (a1 * (GdUtils.RED_MAX - GdUtils.getTrueColorRed(src))) / GdUtils.ALPHA_MAX;
-		r2 = GdUtils.RED_MAX - (a2 * (GdUtils.RED_MAX - GdUtils.getTrueColorRed(dst))) / GdUtils.ALPHA_MAX;
-		g1 = GdUtils.GREEN_MAX - (a1 * (GdUtils.GREEN_MAX - GdUtils.getTrueColorGreen(src))) / GdUtils.ALPHA_MAX;
-		g2 = GdUtils.GREEN_MAX - (a2 * (GdUtils.GREEN_MAX - GdUtils.getTrueColorGreen(dst))) / GdUtils.ALPHA_MAX;
-		b1 = GdUtils.BLUE_MAX - (a1 * (GdUtils.BLUE_MAX - GdUtils.getTrueColorBlue(src))) / GdUtils.ALPHA_MAX;
-		b2 = GdUtils.BLUE_MAX - (a2 * (GdUtils.BLUE_MAX - GdUtils.getTrueColorBlue(dst))) / GdUtils.ALPHA_MAX ;
+		r1 = GdUtils.RED_MAX - (a1 * (GdUtils.RED_MAX - GdUtils.trueColorGetRed(src))) / GdUtils.ALPHA_MAX;
+		r2 = GdUtils.RED_MAX - (a2 * (GdUtils.RED_MAX - GdUtils.trueColorGetRed(dst))) / GdUtils.ALPHA_MAX;
+		g1 = GdUtils.GREEN_MAX - (a1 * (GdUtils.GREEN_MAX - GdUtils.trueColorGetGreen(src))) / GdUtils.ALPHA_MAX;
+		g2 = GdUtils.GREEN_MAX - (a2 * (GdUtils.GREEN_MAX - GdUtils.trueColorGetGreen(dst))) / GdUtils.ALPHA_MAX;
+		b1 = GdUtils.BLUE_MAX - (a1 * (GdUtils.BLUE_MAX - GdUtils.trueColorGetBlue(src))) / GdUtils.ALPHA_MAX;
+		b2 = GdUtils.BLUE_MAX - (a2 * (GdUtils.BLUE_MAX - GdUtils.trueColorGetBlue(dst))) / GdUtils.ALPHA_MAX ;
 
 		a1 = GdUtils.ALPHA_MAX - a1;
 		a2 = GdUtils.ALPHA_MAX - a2;
@@ -408,10 +408,10 @@ public class GdImage {
 						if (brush.trueColor) {
 							setPixel(lx, ly,
 									colorResolveAlpha(
-											GdUtils.getTrueColorRed(p),
-											GdUtils.getTrueColorGreen(p),
-											GdUtils.getTrueColorBlue(p),
-											GdUtils.getTrueColorAlpha(p)));
+											GdUtils.trueColorGetRed(p),
+											GdUtils.trueColorGetGreen(p),
+											GdUtils.trueColorGetBlue(p),
+											GdUtils.trueColorGetAlpha(p)));
 						} else {
 							setPixel(lx, ly, brushColorMap[p]);
 						}
@@ -435,7 +435,7 @@ public class GdImage {
 			p = tile.getPixel(srcx, srcy);
 			if (p != tile.transparent) {
 				if (!tile.trueColor) {
-					p = GdUtils.getTrueColorAlpha(tile.red[p], tile.green[p], tile.blue[p], tile.alpha[p]);
+					p = GdUtils.trueColorMixAlpha(tile.red[p], tile.green[p], tile.blue[p], tile.alpha[p]);
 				}
 				setPixel(x, y, p);
 			}
@@ -448,10 +448,10 @@ public class GdImage {
 				   on a palette destination. */
 					setPixel(x, y,
 							colorResolveAlpha(
-									GdUtils.getTrueColorRed(p),
-									GdUtils.getTrueColorGreen(p),
-									GdUtils.getTrueColorBlue(p),
-									GdUtils.getTrueColorAlpha(p)));
+									GdUtils.trueColorGetRed(p),
+									GdUtils.trueColorGetGreen(p),
+									GdUtils.trueColorGetBlue(p),
+									GdUtils.trueColorGetAlpha(p)));
 				} else {
 					setPixel(x, y, tileColorMap[p]);
 				}
@@ -484,7 +484,7 @@ public class GdImage {
 		long rd, gd, bd, ad, dist;
 		long mindist = 4 * 255 * 255;	/* init to max poss dist */
 		if (trueColor) {
-			return GdUtils.getTrueColorAlpha(r, g, b, a);
+			return GdUtils.trueColorMixAlpha(r, g, b, a);
 		}
 
 		for (c = 0; c < colorsTotal; c++) {
@@ -535,7 +535,7 @@ public class GdImage {
 	/* Returns an exact match only, including alpha */
 	public int colorExactAlpha(final int r, final int g, final int b, final int a) {
 		if (trueColor) {
-			return GdUtils.getTrueColorAlpha(r, g, b, a);
+			return GdUtils.trueColorMixAlpha(r, g, b, a);
 		}
 		for (int i = 0; (i < (colorsTotal)); i++) {
 			if (open[i]) {
@@ -559,7 +559,7 @@ public class GdImage {
 		int i;
 		int ct = (-1);
 		if (trueColor) {
-			return GdUtils.getTrueColorAlpha(r, g, b, a);
+			return GdUtils.trueColorMixAlpha(r, g, b, a);
 		}
 		for (i = 0; (i < (colorsTotal)); i++) {
 			if (open[i]) {
@@ -940,18 +940,18 @@ public class GdImage {
 				&& (t != 0x00))) {
 		return;
 	}
-		dr = GdUtils.getTrueColorRed(color);
-		dg = GdUtils.getTrueColorGreen(color);
-		db = GdUtils.getTrueColorBlue(color);
+		dr = GdUtils.trueColorGetRed(color);
+		dg = GdUtils.trueColorGetGreen(color);
+		db = GdUtils.trueColorGetBlue(color);
 
-		r = GdUtils.getTrueColorRed(p);
-		g = GdUtils.getTrueColorGreen(p);
-		b = GdUtils.getTrueColorBlue(p);
+		r = GdUtils.trueColorGetRed(p);
+		g = GdUtils.trueColorGetGreen(p);
+		b = GdUtils.trueColorGetBlue(p);
 
 		dr = blendColor(t, r, dr);
 		dg = blendColor(t, g, dg);
 		db = blendColor(t, b, db);
-		tpixels[y][x] = GdUtils.getTrueColorAlpha(dr, dg, db, GdUtils.ALPHA_OPAQUE);
+		tpixels[y][x] = GdUtils.trueColorMixAlpha(dr, dg, db, GdUtils.ALPHA_OPAQUE);
 	}
 
 	/**
@@ -1224,19 +1224,19 @@ public class GdImage {
 	}
 
 	public int getRed(final int c) {
-		return trueColor ? GdUtils.getTrueColorRed(c) : red[(c)];
+		return trueColor ? GdUtils.trueColorGetRed(c) : red[(c)];
 	}
 
 	public int getGreen(final int c) {
-		return trueColor ? GdUtils.getTrueColorGreen(c) : green[(c)];
+		return trueColor ? GdUtils.trueColorGetGreen(c) : green[(c)];
 	}
 
 	public int getBlue(final int c) {
-		return trueColor ? GdUtils.getTrueColorBlue(c) : blue[(c)];
+		return trueColor ? GdUtils.trueColorGetBlue(c) : blue[(c)];
 	}
 
 	public int getAlpha(final int c) {
-		return trueColor ? GdUtils.getTrueColorAlpha(c) : alpha[(c)];
+		return trueColor ? GdUtils.trueColorGetAlpha(c) : alpha[(c)];
 	}
 
 	public void setBrush(final GdImage brush) {
@@ -1429,9 +1429,9 @@ public class GdImage {
 			for (x = 0; x < sx; x++) {
 				final int c = src_row[x];
 				if (c == transparent) {
-					dst_row[x] = GdUtils.getTrueColorAlpha(0, 0, 0, 127);
+					dst_row[x] = GdUtils.trueColorMixAlpha(0, 0, 0, 127);
 				} else {
-					dst_row[x] = GdUtils.getTrueColorAlpha(red[c], green[c], blue[c], alpha[c]);
+					dst_row[x] = GdUtils.trueColorMixAlpha(red[c], green[c], blue[c], alpha[c]);
 				}
 			}
 		}
@@ -1459,7 +1459,7 @@ public class GdImage {
 		boolean first = true;
 		long mindist = 0;
 		if (trueColor) {
-			return GdUtils.getTrueColorAlpha(r, g, b, a);
+			return GdUtils.trueColorMixAlpha(r, g, b, a);
 		}
 		for (i = 0; (i < (colorsTotal)); i++) {
 			long dist;
@@ -1599,7 +1599,7 @@ public class GdImage {
 					for (int x = 0; (x < w); x++) {
 						int c = src.getPixel(srcX + x, srcY + y);
 						if (c != src.transparent) {
-							dst.setPixel(dstX + x, dstY + y, GdUtils.getTrueColorAlpha(
+							dst.setPixel(dstX + x, dstY + y, GdUtils.trueColorMixAlpha(
 									src.red[c], src.green[c], src.blue[c], src.alpha[c]));
 						}
 					}
@@ -1633,10 +1633,10 @@ public class GdImage {
 				 works badly, but it beats crashing! Thanks
 				 to Padhrig McCarthy. */
 					mapTo = dst.colorResolveAlpha(
-							GdUtils.getTrueColorRed(c),
-							GdUtils.getTrueColorGreen(c),
-							GdUtils.getTrueColorBlue(c),
-							GdUtils.getTrueColorAlpha(c));
+							GdUtils.trueColorGetRed(c),
+							GdUtils.trueColorGetGreen(c),
+							GdUtils.trueColorGetBlue(c),
+							GdUtils.trueColorGetAlpha(c));
 				} else if (colorMap[c] == (-1)) {
 				/* If it's the same image, mapping is trivial */
 					if (dst == src) {
@@ -1824,10 +1824,10 @@ public class GdImage {
 						   destination image. This is slow and
 						   works badly. */
 							mapTo = dst.colorResolveAlpha(
-									GdUtils.getTrueColorRed(c),
-									GdUtils.getTrueColorGreen(c),
-									GdUtils.getTrueColorBlue(c),
-									GdUtils.getTrueColorAlpha(c));
+									GdUtils.trueColorGetRed(c),
+									GdUtils.trueColorGetGreen(c),
+									GdUtils.trueColorGetBlue(c),
+									GdUtils.trueColorGetAlpha(c));
 						} else {
 						/* Have we established a mapping for this color? */
 							if (colorMap[c] == (-1)) {
@@ -2013,10 +2013,10 @@ public class GdImage {
 						p = src.getTrueColorPixel(
 								(int) sx + srcX,
 								(int) sy + srcY);
-						red += GdUtils.getTrueColorRed(p) * pcontribution;
-						green += GdUtils.getTrueColorGreen(p) * pcontribution;
-						blue += GdUtils.getTrueColorBlue(p) * pcontribution;
-						alpha += GdUtils.getTrueColorAlpha(p) * pcontribution;
+						red += GdUtils.trueColorGetRed(p) * pcontribution;
+						green += GdUtils.trueColorGetGreen(p) * pcontribution;
+						blue += GdUtils.trueColorGetBlue(p) * pcontribution;
+						alpha += GdUtils.trueColorGetAlpha(p) * pcontribution;
 						spixels += xportion * yportion;
 						sx += 1.0;
 					} while (sx < sx2);
@@ -2052,7 +2052,7 @@ public class GdImage {
 				}
 				dst.setPixel(
 						x, y,
-						GdUtils.getTrueColorAlpha((int) red,
+						GdUtils.trueColorMixAlpha((int) red,
 								(int) green,
 								(int) blue, (int) alpha));
 			}
