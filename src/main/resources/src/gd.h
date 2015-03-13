@@ -124,12 +124,6 @@ BGD_DECLARE(gdImagePtr) gdImageCreateFromXpm (char *filename);
 
 BGD_DECLARE(void) gdImageAABlend (gdImagePtr im);
 
-/* Corners specified (not width and height). Upper left first, lower right
-   second. */
-BGD_DECLARE(void) gdImageRectangle (gdImagePtr im, int x1, int y1, int x2, int y2,
-                                    int color);
-BGD_DECLARE(void) gdImageSetResolution(gdImagePtr im, const unsigned int res_x, const unsigned int res_y);
-BGD_DECLARE(int) gdImageBoundsSafe (gdImagePtr im, int x, int y);
 BGD_DECLARE(void) gdImageChar (gdImagePtr im, gdFontPtr f, int x, int y, int c,
                                int color);
 BGD_DECLARE(void) gdImageCharUp (gdImagePtr im, gdFontPtr f, int x, int y, int c,
