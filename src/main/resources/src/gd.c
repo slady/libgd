@@ -522,11 +522,6 @@ dashedSet (gdImagePtr im, int x, int y, int color,
 	*onP = on;
 }
 
-BGD_DECLARE(int) gdImageBoundsSafe (gdImagePtr im, int x, int y)
-{
-	return gdImageBoundsSafeMacro (im, x, y);
-}
-
 BGD_DECLARE(void) gdImageChar (gdImagePtr im, gdFontPtr f, int x, int y, int c, int color)
 {
 	int cx, cy;
