@@ -256,23 +256,8 @@ BGD_DECLARE(char *) gdImageStringFTEx (gdImage * im, int *brect, int fg, char *f
                                        double ptsize, double angle, int x, int y,
                                        char *string, gdFTStringExtraPtr strex);
 
-/* These functions still work with truecolor images,
-   for which they never return error. */
-BGD_DECLARE(int) gdImageColorAllocate (gdImagePtr im, int r, int g, int b);
-/* gd 2.0: palette entries with non-opaque transparency are permitted. */
-BGD_DECLARE(int) gdImageColorAllocateAlpha (gdImagePtr im, int r, int g, int b, int a);
 /* An alternate method */
 BGD_DECLARE(int) gdImageColorClosestHWB (gdImagePtr im, int r, int g, int b);
-/* Returns exact, 100% opaque matches only */
-BGD_DECLARE(int) gdImageColorExact (gdImagePtr im, int r, int g, int b);
-/* Returns an exact match only, including alpha */
-BGD_DECLARE(int) gdImageColorExactAlpha (gdImagePtr im, int r, int g, int b, int a);
-/* Opaque only */
-BGD_DECLARE(int) gdImageColorResolve (gdImagePtr im, int r, int g, int b);
-/* Based on gdImageColorExactAlpha and gdImageColorClosestAlpha */
-BGD_DECLARE(int) gdImageColorResolveAlpha (gdImagePtr im, int r, int g, int b, int a);
-
-BGD_DECLARE(void) gdImageColorDeallocate (gdImagePtr im, int color);
 
 /* Converts a truecolor image to a palette-based image,
    using a high-quality two-pass quantization routine
@@ -485,46 +470,8 @@ BGD_DECLARE(void) gdImageFilledEllipse (gdImagePtr im, int cx, int cy, int w, in
 BGD_DECLARE(void) gdImageFillToBorder (gdImagePtr im, int x, int y, int border,
                                        int color);
 BGD_DECLARE(void) gdImageFill (gdImagePtr im, int x, int y, int color);
-BGD_DECLARE(void) gdImageCopy (gdImagePtr dst, gdImagePtr src, int dstX, int dstY,
-                               int srcX, int srcY, int w, int h);
-BGD_DECLARE(void) gdImageCopyMerge (gdImagePtr dst, gdImagePtr src, int dstX, int dstY,
-                                    int srcX, int srcY, int w, int h, int pct);
-BGD_DECLARE(void) gdImageCopyMergeGray (gdImagePtr dst, gdImagePtr src, int dstX,
-                                        int dstY, int srcX, int srcY, int w, int h,
-                                        int pct);
 
-/* Stretches or shrinks to fit, as needed. Does NOT attempt
-   to average the entire set of source pixels that scale down onto the
-   destination pixel. */
-BGD_DECLARE(void) gdImageCopyResized (gdImagePtr dst, gdImagePtr src, int dstX, int dstY,
-                                      int srcX, int srcY, int dstW, int dstH, int srcW,
-                                      int srcH);
 
-/* gd 2.0: stretches or shrinks to fit, as needed. When called with a
-   truecolor destination image, this function averages the
-   entire set of source pixels that scale down onto the
-   destination pixel, taking into account what portion of the
-   destination pixel each source pixel represents. This is a
-   floating point operation, but this is not a performance issue
-   on modern hardware, except for some embedded devices. If the
-   destination is a palette image, gdImageCopyResized is
-   substituted automatically. */
-BGD_DECLARE(void) gdImageCopyResampled (gdImagePtr dst, gdImagePtr src, int dstX,
-                                        int dstY, int srcX, int srcY, int dstW, int dstH,
-                                        int srcW, int srcH);
-
-/* gd 2.0.8: gdImageCopyRotated is added. Source
-   is a rectangle, with its upper left corner at
-   srcX and srcY. Destination is the *center* of
-   the rotated copy. Angle is in degrees, same as
-   gdImageArc. Floating point destination center
-   coordinates allow accurate rotation of
-   objects of odd-numbered width or height. */
-BGD_DECLARE(void) gdImageCopyRotated (gdImagePtr dst,
-                                      gdImagePtr src,
-                                      double dstX, double dstY,
-                                      int srcX, int srcY,
-                                      int srcWidth, int srcHeight, int angle);
 
 BGD_DECLARE(gdImagePtr) gdImageClone (gdImagePtr src);
 

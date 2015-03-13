@@ -1,5 +1,9 @@
 package info.miranda.gd;
 
+import static java.lang.Math.cos;
+import static java.lang.Math.sin;
+import static java.lang.Math.sqrt;
+
 /*
    The data structure in which gd stores images.
 */
@@ -467,10 +471,12 @@ public class GdImage {
  * return a color index in one search over the color table.
  */
 
+	/* Opaque only */
 	private int colorResolve(int r, int g, int b) {
 		return colorResolveAlpha(r, g, b, GdUtils.ALPHA_OPAQUE);
 	}
 
+	/* Based on gdImageColorExactAlpha and gdImageColorClosestAlpha */
 	private int colorResolveAlpha(int r, int g, int b, int a) {
 		int c;
 		int ct = -1;
@@ -519,6 +525,69 @@ public class GdImage {
 		alpha[op] = a;
 		open[op] = false;
 		return op;			/* Return newly allocated color */
+	}
+
+	/* Returns exact, 100% opaque matches only */
+	public int colorExact(final int r, final int g, final int b) {
+		return colorExactAlpha(r, g, b, GdUtils.ALPHA_OPAQUE);
+	}
+
+	/* Returns an exact match only, including alpha */
+	public int colorExactAlpha(final int r, final int g, final int b, final int a) {
+		if (trueColor) {
+			return GdUtils.gdTrueColorAlpha(r, g, b, a);
+		}
+		for (int i = 0; (i < (colorsTotal)); i++) {
+			if (open[i]) {
+				continue;
+			}
+			if ((red[i] == r) && (green[i] == g) && (blue[i] == b) && (alpha[i] == a)) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	/* These functions still work with truecolor images,
+	   for which they never return error. */
+	public int colorAllocate(final int r, int g, int b) {
+		return colorAllocateAlpha(r, g, b, GdUtils.ALPHA_OPAQUE);
+	}
+
+	/* gd 2.0: palette entries with non-opaque transparency are permitted. */
+	public int colorAllocateAlpha(int r, int g, int b, int a) {
+		int i;
+		int ct = (-1);
+		if (trueColor) {
+			return GdUtils.gdTrueColorAlpha(r, g, b, a);
+		}
+		for (i = 0; (i < (colorsTotal)); i++) {
+			if (open[i]) {
+				ct = i;
+				break;
+			}
+		}
+		if (ct == (-1)) {
+			ct = colorsTotal;
+			if (ct == GdUtils.MAX_COLORS) {
+				return -1;
+			}
+			colorsTotal++;
+		}
+		red[ct] = r;
+		green[ct] = g;
+		blue[ct] = b;
+		alpha[ct] = a;
+		open[ct] = false;
+		return ct;
+	}
+
+	public void gdImageColorDeallocate(int color) {
+		if (trueColor || (color >= GdUtils.MAX_COLORS) || (color < 0)) {
+			return;
+		}
+	/* Mark it open. */
+		open[color] = true;
 	}
 
 	/* Bresenham as presented in Foley & Van Dam */
@@ -1343,6 +1412,582 @@ public class GdImage {
 			}
 		}
 		return ct;
+	}
+
+
+
+	public GdImage imageClone() {
+		GdImage dst;
+		int i, x;
+
+		if (this.trueColor) {
+			dst = new GdImage(this.sx , this.sy, GdImageColorType.TRUE_COLOR);
+		} else {
+			dst = new GdImage(this.sx , this.sy, GdImageColorType.PALETTE_BASED_COLOR);
+		}
+
+		if (!this.trueColor) {
+			dst.colorsTotal = this.colorsTotal;
+			for (i = 0; i < GdUtils.MAX_COLORS; i++) {
+				dst.red[i]   = this.red[i];
+				dst.green[i] = this.green[i];
+				dst.blue[i]  = this.blue[i];
+				dst.alpha[i] = this.alpha[i];
+				dst.open[i]  = this.open[i];
+			}
+			for (i = 0; i < this.sy; i++) {
+				for (x = 0; x < this.sx; x++) {
+					dst.pixels[i][x] = this.pixels[i][x];
+				}
+			}
+		} else {
+			for (i = 0; i < this.sy; i++) {
+				for (x = 0; x < this.sx; x++) {
+					dst.tpixels[i][x] = this.tpixels[i][x];
+				}
+			}
+		}
+
+		if (this.styleLength > 0) {
+			dst.styleLength = this.styleLength;
+			dst.stylePos    = this.stylePos;
+			for (i = 0; i < this.styleLength; i++) {
+				dst.style[i] = this.style[i];
+			}
+		}
+
+		dst.interlace   = this.interlace;
+
+		dst.alphaBlendingFlag = this.alphaBlendingFlag;
+		dst.saveAlphaFlag     = this.saveAlphaFlag;
+		dst.AA                = this.AA;
+		dst.AA_color          = this.AA_color;
+		dst.AA_dont_blend     = this.AA_dont_blend;
+
+		dst.cx1 = this.cx1;
+		dst.cy1 = this.cy1;
+		dst.cx2 = this.cx2;
+		dst.cy2 = this.cy2;
+
+		dst.res_x = this.res_x;
+		dst.res_y = this.res_x;
+
+		dst.paletteQuantizationMethod     = this.paletteQuantizationMethod;
+		dst.paletteQuantizationSpeed      = this.paletteQuantizationSpeed;
+		dst.paletteQuantizationMinQuality = this.paletteQuantizationMinQuality;
+		dst.paletteQuantizationMinQuality = this.paletteQuantizationMinQuality;
+
+		dst.interpolation_id = this.interpolation_id;
+//		dst.interpolation    = this.interpolation;
+
+		if (this.brush != null) {
+			dst.brush = this.brush.imageClone();
+		}
+
+		if (this.tile != null) {
+			dst.tile = this.tile.imageClone();
+		}
+
+		if (this.style != null) {
+			dst.setStyle(this.style, this.styleLength);
+		}
+
+		for (i = 0; i < GdUtils.MAX_COLORS; i++) {
+			dst.brushColorMap[i] = this.brushColorMap[i];
+			dst.tileColorMap[i] = this.tileColorMap[i];
+		}
+
+		if (this.polyAllocated > 0) {
+			dst.polyAllocated = this.polyAllocated;
+			for (i = 0; i < this.polyAllocated; i++) {
+				dst.polyInts[i] = this.polyInts[i];
+			}
+		}
+
+		return dst;
+	}
+
+	public static void imageCopy(final GdImage dst, final GdImage src, final int dstX, final int dstY, final int srcX,
+						  final int srcY, final int w, final int h) {
+		if (dst.trueColor) {
+		/* 2.0: much easier when the destination is truecolor. */
+		/* 2.0.10: needs a transparent-index check that is still valid if
+		 * the source is not truecolor. Thanks to Frank Warmerdam.
+		 */
+
+			if (src.trueColor) {
+				for (int y = 0; (y < h); y++) {
+					for (int x = 0; (x < w); x++) {
+						int c = src.getTrueColorPixel(srcX + x, srcY + y);
+						if (c != src.transparent) {
+							dst.setPixel(dstX + x, dstY + y, c);
+						}
+					}
+				}
+			} else {
+			/* source is palette based */
+				for (int y = 0; (y < h); y++) {
+					for (int x = 0; (x < w); x++) {
+						int c = src.getPixel(srcX + x, srcY + y);
+						if (c != src.transparent) {
+							dst.setPixel(dstX + x, dstY + y, GdUtils.gdTrueColorAlpha(
+									src.red[c], src.green[c], src.blue[c], src.alpha[c]));
+						}
+					}
+				}
+			}
+			return;
+		}
+
+
+		int[] colorMap = new int[GdUtils.MAX_COLORS];
+
+		for (int i = 0; (i < GdUtils.MAX_COLORS); i++) {
+			colorMap[i] = (-1);
+		}
+		int toy = dstY;
+		for (int y = srcY; (y < (srcY + h)); y++) {
+			int tox = dstX;
+			for (int x = srcX; (x < (srcX + w)); x++) {
+				int nc;
+				int mapTo;
+				int c = src.getPixel(x, y);
+			/* Added 7/24/95: support transparent copies */
+				if (src.transparent == c) {
+					tox++;
+					continue;
+				}
+			/* Have we established a mapping for this color? */
+				if (src.trueColor) {
+				/* 2.05: remap to the palette available in the
+				 destination image. This is slow and
+				 works badly, but it beats crashing! Thanks
+				 to Padhrig McCarthy. */
+					mapTo = dst.colorResolveAlpha(
+							GdUtils.gdTrueColorGetRed(c),
+							GdUtils.gdTrueColorGetGreen(c),
+							GdUtils.gdTrueColorGetBlue(c),
+							GdUtils.gdTrueColorGetAlpha(c));
+				} else if (colorMap[c] == (-1)) {
+				/* If it's the same image, mapping is trivial */
+					if (dst == src) {
+						nc = c;
+					} else {
+					/* Get best match possible. This
+					   function never returns error. */
+						nc = dst.colorResolveAlpha(
+								src.red[c], src.green[c],
+								src.blue[c], src.alpha[c]);
+					}
+					colorMap[c] = nc;
+					mapTo = colorMap[c];
+				} else {
+					mapTo = colorMap[c];
+				}
+				dst.setPixel(tox, toy, mapTo);
+				tox++;
+			}
+			toy++;
+		}
+	}
+
+	/* This function is a substitute for real alpha channel operations,
+	   so it doesn't pay attention to the alpha channel. */
+	public static void imageCopyMerge(final GdImage dst, final GdImage src, final int dstX, final int dstY,
+									  final int srcX, final int srcY, final int w, final int h, final int pct) {
+		int toy = dstY;
+		for (int y = srcY; (y < (srcY + h)); y++) {
+			int tox = dstX;
+			for (int x = srcX; (x < (srcX + w)); x++) {
+				int nc;
+				final int c = src.getPixel(x, y);
+			/* Added 7/24/95: support transparent copies */
+				if (src.transparent == c) {
+					tox++;
+					continue;
+				}
+			/* If it's the same image, mapping is trivial */
+				if (dst == src) {
+					nc = c;
+				} else {
+					final int dc = dst.getPixel(tox, toy);
+
+					final int ncR = (int) (src.getRed(c) * (pct / 100.0)
+							+ dst.getRed(dc) * ((100 - pct) / 100.0));
+					final int ncG = (int) (src.getGreen(c) * (pct / 100.0)
+							+ dst.getGreen(dc) * ((100 - pct) / 100.0));
+					final int ncB = (int) (src.getBlue(c) * (pct / 100.0)
+							+ dst.getBlue(dc) * ((100 - pct) / 100.0));
+
+				/* Find a reasonable color */
+					nc = dst.colorResolve(ncR, ncG, ncB);
+				}
+				dst.setPixel(tox, toy, nc);
+				tox++;
+			}
+			toy++;
+		}
+	}
+
+	/* This function is a substitute for real alpha channel operations,
+	   so it doesn't pay attention to the alpha channel. */
+	public static void imageCopyMergeGray(GdImage dst, GdImage src, int dstX, int dstY,
+	int srcX, int srcY, int w, int h, int pct)
+	{
+
+		int c, dc;
+		int x, y;
+		int tox, toy;
+		int ncR, ncG, ncB;
+		float g;
+		toy = dstY;
+		for (y = srcY; (y < (srcY + h)); y++) {
+			tox = dstX;
+			for (x = srcX; (x < (srcX + w)); x++) {
+				int nc;
+				c = src.getPixel(x, y);
+			/* Added 7/24/95: support transparent copies */
+				if (src.transparent == c) {
+					tox++;
+					continue;
+				}
+			/*
+			 * If it's the same image, mapping is NOT trivial since we
+			 * merge with greyscale target, but if pct is 100, the grey
+			 * value is not used, so it becomes trivial. pjw 2.0.12.
+			 */
+				if (dst == src && pct == 100) {
+					nc = c;
+				} else {
+					dc = dst.getPixel(tox, toy);
+					g = (int) (0.29900 * dst.getRed(dc)
+							+ 0.58700 * dst.getGreen(dc) + 0.11400 * dst.getBlue(dc));
+
+					ncR = (int) (src.getRed(c) * (pct / 100.0)
+							+ g * ((100 - pct) / 100.0));
+					ncG = (int) (src.getGreen(c) * (pct / 100.0)
+							+ g * ((100 - pct) / 100.0));
+					ncB = (int) (src.getBlue(c) * (pct / 100.0)
+							+ g * ((100 - pct) / 100.0));
+
+				/* First look for an exact match */
+					nc = dst.colorExact(ncR, ncG, ncB);
+					if (nc == (-1)) {
+					/* No, so try to allocate it */
+						nc = dst.colorAllocate(ncR, ncG, ncB);
+					/* If we're out of colors, go for the
+					   closest color */
+						if (nc == (-1)) {
+							nc = dst.findColorClosest(ncR, ncG, ncB);
+						}
+					}
+				}
+				dst.setPixel(tox, toy, nc);
+				tox++;
+			}
+			toy++;
+		}
+	}
+
+/* Stretches or shrinks to fit, as needed. Does NOT attempt
+   to average the entire set of source pixels that scale down onto the
+   destination pixel. */
+	public static void imageCopyResized(final GdImage dst, final GdImage src, final int dstX, final int dstY,
+								   final int srcX, final int srcY, final int dstW, final int dstH,
+								   final int srcW, final int srcH) {
+		int[] colorMap = new int[GdUtils.MAX_COLORS];
+	/* Stretch vectors */
+	/* We only need to use floating point to determine the correct
+	   stretch vector for one line's worth. */
+		int[] stx = new int[srcW];
+		int[] sty = new int[srcH];
+
+	/* Fixed by Mao Morimoto 2.0.16 */
+		for (int i = 0; (i < srcW); i++) {
+			stx[i] = dstW * (i + 1) / srcW - dstW * i / srcW;
+		}
+		for (int i = 0; (i < srcH); i++) {
+			sty[i] = dstH * (i + 1) / srcH - dstH * i / srcH;
+		}
+		for (int i = 0; (i < GdUtils.MAX_COLORS); i++) {
+			colorMap[i] = (-1);
+		}
+		int toy = dstY;
+		for (int y = srcY; (y < (srcY + srcH)); y++) {
+			for (int ydest = 0; (ydest < sty[y - srcY]); ydest++) {
+				int tox = dstX;
+				for (int x = srcX; (x < (srcX + srcW)); x++) {
+					int nc = 0;
+					int mapTo;
+					if (stx[x - srcX] == 0) {
+						continue;
+					}
+					if (dst.trueColor) {
+					/* 2.0.9: Thorben Kundinger: Maybe the source image is not
+					   a truecolor image */
+						if (!src.trueColor) {
+							int tmp = src.getPixel(x, y);
+							mapTo = src.getTrueColorPixel(x, y);
+							if (src.transparent == tmp) {
+							/* 2.0.21, TK: not tox++ */
+								tox += stx[x - srcX];
+								continue;
+							}
+						} else {
+						/* TK: old code follows */
+							mapTo = src.getTrueColorPixel(x, y);
+						/* Added 7/24/95: support transparent copies */
+							if (src.transparent == mapTo) {
+							/* 2.0.21, TK: not tox++ */
+								tox += stx[x - srcX];
+								continue;
+							}
+						}
+					} else {
+						final int c = src.getPixel(x, y);
+					/* Added 7/24/95: support transparent copies */
+						if (src.transparent == c) {
+							tox += stx[x - srcX];
+							continue;
+						}
+						if (src.trueColor) {
+						/* Remap to the palette available in the
+						   destination image. This is slow and
+						   works badly. */
+							mapTo = dst.colorResolveAlpha(
+									GdUtils.gdTrueColorGetRed(c),
+									GdUtils.gdTrueColorGetGreen(c),
+									GdUtils.gdTrueColorGetBlue(c),
+									GdUtils.gdTrueColorGetAlpha(c));
+						} else {
+						/* Have we established a mapping for this color? */
+							if (colorMap[c] == (-1)) {
+							/* If it's the same image, mapping is trivial */
+								if (dst == src) {
+									nc = c;
+								} else {
+								/* Find or create the best match */
+								/* 2.0.5: can't use gdTrueColorGetRed, etc with palette */
+									nc = dst.colorResolveAlpha(
+											src.getRed(c),
+											src.getGreen(c),
+											src.getBlue(c),
+											src.getAlpha(c));
+								}
+								colorMap[c] = nc;
+							}
+							mapTo = colorMap[c];
+						}
+					}
+					for (int i = 0; (i < stx[x - srcX]); i++) {
+						dst.setPixel(tox, toy, mapTo);
+						tox++;
+					}
+				}
+				toy++;
+			}
+		}
+	}
+
+/* gd 2.0.8: gdImageCopyRotated is added. Source
+	is a rectangle, with its upper left corner at
+	srcX and srcY. Destination is the *center* of
+		the rotated copy. Angle is in degrees, same as
+		gdImageArc. Floating point destination center
+	coordinates allow accurate rotation of
+	objects of odd-numbered width or height. */
+
+/* gd 2.0.8: gdImageCopyRotated is added. Source
+   is a rectangle, with its upper left corner at
+   srcX and srcY. Destination is the *center* of
+   the rotated copy. Angle is in degrees, same as
+   gdImageArc. Floating point destination center
+   coordinates allow accurate rotation of
+   objects of odd-numbered width or height. */
+	public static void imageCopyRotated(final GdImage dst, final GdImage src, final double dstX, final double dstY,
+								 final int srcX, final int srcY,
+								 final int srcWidth, final int srcHeight, final int angle) {
+		double radius = sqrt(srcWidth * srcWidth + srcHeight * srcHeight);
+		double aCos = cos(angle * .0174532925);
+		double aSin = sin(angle * .0174532925);
+		double scX = srcX + ((double) srcWidth) / 2;
+		double scY = srcY + ((double) srcHeight) / 2;
+		int[] cmap = new int[GdUtils.MAX_COLORS];
+		int i;
+
+	/*
+		 2.0.34: transparency preservation. The transparentness of
+		 the transparent color is more important than its hue.
+	*/
+		if (src.transparent != -1) {
+			if (dst.transparent == -1) {
+				dst.transparent = src.transparent;
+			}
+		}
+
+		for (i = 0; (i < GdUtils.MAX_COLORS); i++) {
+			cmap[i] = (-1);
+		}
+		for (double dy = dstY - radius; (dy <= dstY + radius); dy++) {
+			for (double dx = dstX - radius; (dx <= dstX + radius); dx++) {
+				double sxd = (dx - dstX) * aCos - (dy - dstY) * aSin;
+				double syd = (dy - dstY) * aCos + (dx - dstX) * aSin;
+				int sx = (int) (sxd + scX);
+				int sy = (int) (syd + scY);
+				if ((sx >= srcX) && (sx < srcX + srcWidth) &&
+						(sy >= srcY) && (sy < srcY + srcHeight)) {
+					int c = src.getPixel(sx, sy);
+				/* 2.0.34: transparency wins */
+					if (c == src.transparent) {
+						dst.setPixel((int) dx, (int) dy, dst.transparent);
+					} else if (!src.trueColor) {
+					/* Use a table to avoid an expensive
+					   lookup on every single pixel */
+						if (cmap[c] == -1) {
+							cmap[c] = dst.colorResolveAlpha(
+									src.getRed(c),
+									src.getGreen(c),
+									src.getBlue(c),
+									src.getAlpha(c));
+						}
+						dst.setPixel((int) dx, (int) dy, cmap[c]);
+					} else {
+						dst.setPixel((int) dx, (int) dy, dst.colorResolveAlpha(
+								src.getRed(c),
+								src.getGreen(c),
+								src.getBlue(c),
+								src.getAlpha(c)));
+					}
+				}
+			}
+		}
+	}
+
+/* When gd 1.x was first created, floating point was to be avoided.
+   These days it is often faster than table lookups or integer
+   arithmetic. The routine below is shamelessly, gloriously
+   floating point. TBB */
+
+/* 2.0.10: cast instead of floor() yields 35% performance improvement.
+	Thanks to John Buckman. */
+
+//	#define floor2(exp) ((long) exp)
+	private static long floor2(final double exp) {
+		return (long) exp;
+	}
+/*#define floor2(exp) floor(exp)*/
+
+/* gd 2.0: stretches or shrinks to fit, as needed. When called with a
+   truecolor destination image, this function averages the
+   entire set of source pixels that scale down onto the
+   destination pixel, taking into account what portion of the
+   destination pixel each source pixel represents. This is a
+   floating point operation, but this is not a performance issue
+   on modern hardware, except for some embedded devices. If the
+   destination is a palette image, gdImageCopyResized is
+   substituted automatically. */
+	public static void imageCopyResampled(final GdImage dst, final GdImage src,
+										  final int dstX, final int dstY, final int srcX, final int srcY,
+										  final int dstW, final int dstH, final int srcW, final int srcH)
+	{
+		int x, y;
+		double sy1, sy2, sx1, sx2;
+		if (!dst.trueColor) {
+			imageCopyResized(dst, src, dstX, dstY, srcX, srcY, dstW, dstH, srcW, srcH);
+			return;
+		}
+		for (y = dstY; (y < dstY + dstH); y++) {
+			sy1 = ((double) y - (double) dstY) * (double) srcH / (double) dstH;
+			sy2 = ((double) (y + 1) - (double) dstY) * (double) srcH /
+					(double) dstH;
+			for (x = dstX; (x < dstX + dstW); x++) {
+				double sx, sy;
+				double spixels = 0;
+				double red = 0.0, green = 0.0, blue = 0.0, alpha = 0.0;
+				double alpha_sum = 0.0, contrib_sum = 0.0;
+
+				sx1 = ((double) x - (double) dstX) * (double) srcW / dstW;
+				sx2 = ((double) (x + 1) - (double) dstX) * (double) srcW / dstW;
+				sy = sy1;
+				do {
+					double yportion;
+					if (floor2 (sy) == floor2 (sy1)) {
+						yportion = 1.0 - (sy - floor2 (sy));
+						if (yportion > sy2 - sy1) {
+							yportion = sy2 - sy1;
+						}
+						sy = floor2 (sy);
+					} else if (sy == floor2 (sy2)) {
+						yportion = sy2 - floor2 (sy2);
+					} else {
+						yportion = 1.0;
+					}
+					sx = sx1;
+					do {
+						double xportion;
+						double pcontribution;
+						int p;
+						if (floor2 (sx) == floor2 (sx1)) {
+							xportion = 1.0 - (sx - floor2 (sx));
+							if (xportion > sx2 - sx1) {
+								xportion = sx2 - sx1;
+							}
+							sx = floor2 (sx);
+						} else if (sx == floor2 (sx2)) {
+							xportion = sx2 - floor2 (sx2);
+						} else {
+							xportion = 1.0;
+						}
+						pcontribution = xportion * yportion;
+					/* 2.08: previously srcX and srcY were ignored.
+					   Andrew Pattison */
+						p = src.getTrueColorPixel(
+								(int) sx + srcX,
+								(int) sy + srcY);
+						red += GdUtils.gdTrueColorGetRed(p) * pcontribution;
+						green += GdUtils.gdTrueColorGetGreen(p) * pcontribution;
+						blue += GdUtils.gdTrueColorGetBlue(p) * pcontribution;
+						alpha += GdUtils.gdTrueColorGetAlpha(p) * pcontribution;
+						spixels += xportion * yportion;
+						sx += 1.0;
+					} while (sx < sx2);
+					sy += 1.0;
+				} while (sy < sy2);
+				if (spixels != 0.0) {
+					red /= spixels;
+					green /= spixels;
+					blue /= spixels;
+					alpha /= spixels;
+					alpha += 0.5;
+				}
+				if ( alpha_sum != 0.0f) {
+					if( contrib_sum != 0.0f) {
+						alpha_sum /= contrib_sum;
+					}
+					red /= alpha_sum;
+					green /= alpha_sum;
+					blue /= alpha_sum;
+				}
+			/* Clamping to allow for rounding errors above */
+				if (red > 255.0) {
+					red = 255.0;
+				}
+				if (green > 255.0) {
+					green = 255.0;
+				}
+				if (blue > 255.0) {
+					blue = 255.0;
+				}
+				if (alpha > GdUtils.ALPHA_MAX) {
+					alpha = GdUtils.ALPHA_MAX;
+				}
+				dst.setPixel(
+						x, y,
+						GdUtils.gdTrueColorAlpha((int) red,
+								(int) green,
+								(int) blue, (int) alpha));
+			}
+		}
 	}
 
 }
