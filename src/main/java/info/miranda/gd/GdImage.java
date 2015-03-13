@@ -1957,19 +1957,17 @@ public class GdImage {
    substituted automatically. */
 	public static void imageCopyResampled(final GdImage dst, final GdImage src,
 										  final int dstX, final int dstY, final int srcX, final int srcY,
-										  final int dstW, final int dstH, final int srcW, final int srcH)
-	{
-		int x, y;
+										  final int dstW, final int dstH, final int srcW, final int srcH) {
 		double sy1, sy2, sx1, sx2;
 		if (!dst.trueColor) {
 			imageCopyResized(dst, src, dstX, dstY, srcX, srcY, dstW, dstH, srcW, srcH);
 			return;
 		}
-		for (y = dstY; (y < dstY + dstH); y++) {
+		for (int y = dstY; (y < dstY + dstH); y++) {
 			sy1 = ((double) y - (double) dstY) * (double) srcH / (double) dstH;
 			sy2 = ((double) (y + 1) - (double) dstY) * (double) srcH /
 					(double) dstH;
-			for (x = dstX; (x < dstX + dstW); x++) {
+			for (int x = dstX; (x < dstX + dstW); x++) {
 				double sx, sy;
 				double spixels = 0;
 				double red = 0.0, green = 0.0, blue = 0.0, alpha = 0.0;
@@ -2057,6 +2055,16 @@ public class GdImage {
 								(int) blue, (int) alpha));
 			}
 		}
+	}
+
+	private boolean isColorMatch(final int col1, final int col2, final float threshold) {
+		final int dr = getRed(col1) - getRed(col2);
+		final int dg = getGreen(col1) - getGreen(col2);
+		final int db = getBlue(col1) - getBlue(col2);
+		final int da = getAlpha(col1) - getAlpha(col2);
+		final int dist = dr * dr + dg * dg + db * db + da * da;
+
+		return (100.0 * dist / 195075) < threshold;
 	}
 
 }
