@@ -124,19 +124,6 @@ BGD_DECLARE(gdImagePtr) gdImageCreateFromXpm (char *filename);
 
 BGD_DECLARE(void) gdImageAABlend (gdImagePtr im);
 
-BGD_DECLARE(void) gdImageChar (gdImagePtr im, gdFontPtr f, int x, int y, int c,
-                               int color);
-BGD_DECLARE(void) gdImageCharUp (gdImagePtr im, gdFontPtr f, int x, int y, int c,
-                                 int color);
-BGD_DECLARE(void) gdImageString (gdImagePtr im, gdFontPtr f, int x, int y,
-                                 unsigned char *s, int color);
-BGD_DECLARE(void) gdImageStringUp (gdImagePtr im, gdFontPtr f, int x, int y,
-                                   unsigned char *s, int color);
-BGD_DECLARE(void) gdImageString16 (gdImagePtr im, gdFontPtr f, int x, int y,
-                                   unsigned short *s, int color);
-BGD_DECLARE(void) gdImageStringUp16 (gdImagePtr im, gdFontPtr f, int x, int y,
-                                     unsigned short *s, int color);
-
 /* 2.0.16: for thread-safe use of gdImageStringFT and friends,
    call this before allowing any thread to call gdImageStringFT.
    Otherwise it is invoked by the first thread to invoke

@@ -2067,4 +2067,59 @@ public class GdImage {
 		return (100.0 * dist / 195075) < threshold;
 	}
 
+	public void writeChar(final GdFont f, final int x, final int y, final int c, final int color) {
+		int cx = 0;
+		int cy = 0;
+		if ((c < f.offset) || (c >= (f.offset + f.nchars))) {
+			return;
+		}
+		final int fline = (c - f.offset) * f.h * f.w;
+		for (int py = y; (py < (y + f.h)); py++) {
+			for (int px = x; (px < (x + f.w)); px++) {
+				if (f.data[fline + cy * f.w + cx] != 0) {
+					setPixel(px, py, color);
+				}
+				cx++;
+			}
+			cx = 0;
+			cy++;
+		}
+	}
+
+	public void writeCharUp(final GdFont f, final int x, final int y, final int c, final int color) {
+		int cx = 0;
+		int cy = 0;
+		if ((c < f.offset) || (c >= (f.offset + f.nchars))) {
+			return;
+		}
+
+		final int fline = (c - f.offset) * f.h * f.w;
+		for (int py = y; (py > (y - f.w)); py--) {
+			for (int px = x; (px < (x + f.h)); px++) {
+				if (f.data[fline + cy * f.w + cx] != 0) {
+					setPixel(px, py, color);
+				}
+				cy++;
+			}
+			cy = 0;
+			cx++;
+		}
+	}
+
+	public void writeString(final GdFont f, int x, final int y, final String s, final int color) {
+		final int l = s.length();
+		for (int i = 0; (i < l); i++) {
+			writeChar(f, x, y, s.charAt(i), color);
+			x += f.w;
+		}
+	}
+
+	public void writeStringUp(final GdFont f, final int x, int y, final String s, final int color) {
+		final int l = s.length();
+		for (int i = 0; (i < l); i++) {
+			writeCharUp(f, x, y, s.charAt(i), color);
+			y -= f.w;
+		}
+	}
+
 }
