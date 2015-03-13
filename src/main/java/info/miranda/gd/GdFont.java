@@ -52,4 +52,12 @@ public class GdFont {
 	   Easily included in code, also easily loaded from
 	   data files. */
 	byte[] data;
+
+	public GdFont(final int nchars, final int offset, final int w, final int h, final byte[] data) {
+		this.nchars = nchars;
+		this.offset = offset;
+		this.w = w;
+		this.h = h;
+		this.data = data;
+	}
 }
