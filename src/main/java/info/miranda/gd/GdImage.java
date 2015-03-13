@@ -104,7 +104,7 @@ public class GdImage {
 //	interpolation_method interpolation;
 
 	/* 2.0.12: this now checks the clipping rectangle */
-	private boolean boundsSafeMacro(final int x, final int y) {
+	private boolean isBoundsSafe(final int x, final int y) {
 		return (!(((y < cy1) || (y > cy2)) || ((x < cx1) || (x > cx2))));
 	}
 
@@ -157,7 +157,7 @@ public class GdImage {
 	}
 
 	public int getPixel(final int x, final int y) {
-		if (boundsSafeMacro(x, y)) {
+		if (isBoundsSafe(x, y)) {
 			if (trueColor) {
 				return tpixels[y][x];
 			} else {
@@ -325,7 +325,7 @@ public class GdImage {
 				setPixel(x, y, AA_color);
 				break;
 			default:
-				if (boundsSafeMacro(x, y)) {
+				if (isBoundsSafe(x, y)) {
 					if (trueColor) {
 						switch (alphaBlendingFlag) {
 							default:
@@ -929,7 +929,7 @@ public class GdImage {
 		int dr,dg,db,p,r,g,b;
 
 	/* 2.0.34: watch out for out of range calls */
-		if (!boundsSafeMacro(x, y)) {
+		if (!isBoundsSafe(x, y)) {
 			return;
 		}
 		p = getPixel(x, y);
