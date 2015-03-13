@@ -76,12 +76,12 @@ public class GdUtils {
 	public static final int GD_CMP_INTERLACE	= 128;	/* Interlaced setting */
 	public static final int GD_CMP_TRUECOLOR	= 256;	/* Truecolor vs palette differs */
 
-	/* For backwards compatibility only. Use gdImageSetStyle()
+	/* For backwards compatibility only. Use setStyle()
    for MUCH more flexible line drawing. Also see
-   gdImageSetBrush(). */
+   setBrush(). */
 	public static final int DASH_SIZE = 4;
 
-	private static final int gdCosT[] = {
+	private static final int COS_T[] = {
 			1024,
 			1023,
 			1023,
@@ -444,7 +444,7 @@ public class GdUtils {
 			1023
 	};
 
-	private static final int gdSinT[] = {
+	private static final int SIN_T[] = {
 			0,
 			17,
 			35,
@@ -807,32 +807,32 @@ public class GdUtils {
 			-17
 	};
 
-	public static int gdTrueColorGetAlpha(final int c) {
+	public static int getTrueColorAlpha(final int c) {
 		return (((c) & 0x7F000000) >> 24);
 	}
 
-	public static int gdTrueColorGetRed(final int c) {
+	public static int getTrueColorRed(final int c) {
 		return (((c) & 0xFF0000) >> 16);
 	}
 
-	public static int gdTrueColorGetGreen(final int c) {
+	public static int getTrueColorGreen(final int c) {
 		return (((c) & 0x00FF00) >> 8);
 	}
 
-	public static int gdTrueColorGetBlue(final int c) {
+	public static int getTrueColorBlue(final int c) {
 		return ((c) & 0x0000FF);
 	}
 
 /* A simpler way to obtain an opaque truecolor value for drawing on a
    truecolor image. Not for use with palette images! */
-	public static int gdTrueColor(final int r, final int g, final int b) {
+	public static int getTrueColor(final int r, final int g, final int b) {
 		return (((r) << 16) + ((g) << 8) + (b));
 	}
 
 /* Returns a truecolor value with an alpha channel component.
-   gdAlphaMax (127, **NOT 255**) is transparent, 0 is completely
+   ALPHA_MAX (127, **NOT 255**) is transparent, 0 is completely
    opaque. */
-	public static int gdTrueColorAlpha(final int r, final int g, final int b, final int a) {
+	public static int getTrueColorAlpha(final int r, final int g, final int b, final int a) {
 		return (((a) << 24) + ((r) << 16) + ((g) << 8) + (b));
 	}
 
