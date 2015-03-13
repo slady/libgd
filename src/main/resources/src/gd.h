@@ -124,10 +124,6 @@ BGD_DECLARE(gdImagePtr) gdImageCreateFromXpm (char *filename);
 
 BGD_DECLARE(void) gdImageAABlend (gdImagePtr im);
 
-/* For backwards compatibility only. Use gdImageSetStyle()
-   for much more flexible line drawing. */
-BGD_DECLARE(void) gdImageDashedLine (gdImagePtr im, int x1, int y1, int x2, int y2,
-                                     int color);
 /* Corners specified (not width and height). Upper left first, lower right
    second. */
 BGD_DECLARE(void) gdImageRectangle (gdImagePtr im, int x1, int y1, int x2, int y2,
