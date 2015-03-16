@@ -534,11 +534,6 @@ BGD_DECLARE(void *) gdDPExtractData (struct gdIOCtx *ctx, int *size);
 #define GD2_FMT_RAW             1
 #define GD2_FMT_COMPRESSED      2
 
-
-BGD_DECLARE(void) gdImageFlipHorizontal(gdImagePtr im);
-BGD_DECLARE(void) gdImageFlipVertical(gdImagePtr im);
-BGD_DECLARE(void) gdImageFlipBoth(gdImagePtr im);
-
 #define GD_FLIP_HORINZONTAL 1
 #define GD_FLIP_VERTICAL 2
 #define GD_FLIP_BOTH 3

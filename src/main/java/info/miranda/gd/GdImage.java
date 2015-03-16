@@ -2122,4 +2122,56 @@ public class GdImage {
 		}
 	}
 
+	public void gdImageFlipVertical() {
+		if (trueColor) {
+			for (int y = 0; y < sy / 2; y++) {
+				int[] row_dst = tpixels[y];
+				int[] row_src = tpixels[sy - 1 - y];
+				for (int x = 0; x < sx; x++) {
+					int p;
+					p = row_dst[x];
+					row_dst[x] = tpixels[sy - 1 - y][x];
+					row_src[x] = p;
+				}
+			}
+		} else {
+			for (int y = 0; y < sy / 2; y++) {
+				for (int x = 0; x < sx; x++) {
+					int p = tpixels[y][x];
+					tpixels[y][x] =	tpixels[sy - 1 - y][x];
+					tpixels[sy - 1 - y][x] = p;
+				}
+			}
+		}
+	}
+
+	public void gdImageFlipHorizontal() {
+		if (trueColor) {
+			for (int y = 0; y < sy; y++) {
+				final int[] row = tpixels[y];
+				for (int x = 0; x < (sx >> 1); x++) {
+					final int z = sx - 1 - x;
+					final int tmp = row[x];
+					row[x] = row[z];
+					row[z] = tmp;
+				}
+			}
+		} else {
+			for (int y = 0; y < sy; y++) {
+				final int[] row = pixels[y];
+				for (int x = 0; x < (sx >> 1); x++) {
+					final int z = sx - 1 - x;
+					final int tmp = row[x];
+					row[x] = row[z];
+					row[z] = tmp;
+				}
+			}
+		}
+	}
+
+	public void gdImageFlipBoth() {
+		gdImageFlipVertical();
+		gdImageFlipHorizontal();
+	}
+
 }
