@@ -420,36 +420,6 @@ BGD_DECLARE(void *) gdImageGdPtr (gdImagePtr im, int *size);
 /* Best to free this memory with gdFree(), not free() */
 BGD_DECLARE(void *) gdImageGd2Ptr (gdImagePtr im, int cs, int fmt, int *size);
 
-/* Style is a bitwise OR ( | operator ) of these.
-   gdArc and gdChord are mutually exclusive;
-   gdChord just connects the starting and ending
-   angles with a straight line, while gdArc produces
-   a rounded edge. gdPie is a synonym for gdArc.
-   gdNoFill indicates that the arc or chord should be
-   outlined, not filled. gdEdged, used together with
-   gdNoFill, indicates that the beginning and ending
-   angles should be connected to the center; this is
-   a good way to outline (rather than fill) a
-   'pie slice'. */
-#define gdArc   0
-#define gdPie   gdArc
-#define gdChord 1
-#define gdNoFill 2
-#define gdEdged 4
-
-BGD_DECLARE(void) gdImageFilledArc (gdImagePtr im, int cx, int cy, int w, int h, int s,
-                                    int e, int color, int style);
-BGD_DECLARE(void) gdImageArc (gdImagePtr im, int cx, int cy, int w, int h, int s, int e,
-                              int color);
-BGD_DECLARE(void) gdImageEllipse(gdImagePtr im, int cx, int cy, int w, int h, int color);
-BGD_DECLARE(void) gdImageFilledEllipse (gdImagePtr im, int cx, int cy, int w, int h,
-                                        int color);
-BGD_DECLARE(void) gdImageFillToBorder (gdImagePtr im, int x, int y, int border,
-                                       int color);
-BGD_DECLARE(void) gdImageFill (gdImagePtr im, int x, int y, int color);
-
-
-
 BGD_DECLARE(gdImagePtr) gdImageClone (gdImagePtr src);
 
 BGD_DECLARE(gdImagePtr) gdImageNeuQuant(gdImagePtr im, const int max_color, int sample_factor);

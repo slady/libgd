@@ -76,12 +76,29 @@ public class GdUtils {
 	public static final int GD_CMP_INTERLACE	= 128;	/* Interlaced setting */
 	public static final int GD_CMP_TRUECOLOR	= 256;	/* Truecolor vs palette differs */
 
+/* Style is a bitwise OR ( | operator ) of these.
+   gdArc and gdChord are mutually exclusive;
+   gdChord just connects the starting and ending
+   angles with a straight line, while gdArc produces
+   a rounded edge. gdPie is a synonym for gdArc.
+   gdNoFill indicates that the arc or chord should be
+   outlined, not filled. gdEdged, used together with
+   gdNoFill, indicates that the beginning and ending
+   angles should be connected to the center; this is
+   a good way to outline (rather than fill) a
+   'pie slice'. */
+	public static final int gdArc = 0;
+	public static final int gdPie = gdArc;
+	public static final int gdChord = 1;
+	public static final int gdNoFill = 2;
+	public static final int gdEdged = 4;
+
 	/* For backwards compatibility only. Use setStyle()
    for MUCH more flexible line drawing. Also see
    setBrush(). */
 	public static final int DASH_SIZE = 4;
 
-	private static final int COS_T[] = {
+	public static final int COS_T[] = {
 			1024,
 			1023,
 			1023,
@@ -444,7 +461,7 @@ public class GdUtils {
 			1023
 	};
 
-	private static final int SIN_T[] = {
+	public static final int SIN_T[] = {
 			0,
 			17,
 			35,

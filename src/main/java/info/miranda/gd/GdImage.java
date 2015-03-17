@@ -1217,6 +1217,199 @@ public class GdImage {
 		stylePos = 0;
 	}
 
+/* s and e are integers modulo 360 (degrees), with 0 degrees
+   being the rightmost extreme and degrees changing clockwise.
+   cx and cy are the center in pixels; w and h are the horizontal
+   and vertical diameter in pixels. Nice interface, but slow.
+   See gd_arc_f_buggy.c for a better version that doesn't
+   seem to be bug-free yet. */
+
+	public void drawArc(final int cx, final int cy, final int w, final int h,
+						   final int s, final int e, final int color) {
+		fillArc(cx, cy, w, h, s, e, color, GdUtils.gdNoFill);
+	}
+
+	public void fillArc(final int cx, final int cy, final int w, final int h, int s, int e,
+								 final int color, final int style) {
+		GdPoint[] pts = new GdPoint[3];
+		int lx = 0, ly = 0;
+		int fx = 0, fy = 0;
+
+		if ((s % 360)  == (e % 360)) {
+			s = 0;
+			e = 360;
+		} else {
+			if (s > 360) {
+				s = s % 360;
+			}
+
+			if (e > 360) {
+				e = e % 360;
+			}
+
+			while (s < 0) {
+				s += 360;
+			}
+
+			while (e < s) {
+				e += 360;
+			}
+
+			if (s == e) {
+				s = 0;
+				e = 360;
+			}
+		}
+
+		for (int i = s; (i <= e); i++) {
+			final int x = (int) (((long) GdUtils.COS_T[i % 360] * (long) w / (2 * 1024)) + cx);
+			final int y = (int) (((long) GdUtils.SIN_T[i % 360] * (long) h / (2 * 1024)) + cy);
+			if (i != s) {
+				if ((style & GdUtils.gdChord) == 0) {
+					if ((style & GdUtils.gdNoFill) != 0) {
+						drawLine(lx, ly, x, y, color);
+					} else {
+					/* This is expensive! */
+						pts[0].x = lx;
+						pts[0].y = ly;
+						pts[1].x = x;
+						pts[1].y = y;
+						pts[2].x = cx;
+						pts[2].y = cy;
+						fillPolygon(pts, color);
+					}
+				}
+			} else {
+				fx = x;
+				fy = y;
+			}
+			lx = x;
+			ly = y;
+		}
+		if ((style & GdUtils.gdChord) != 0) {
+			if ((style & GdUtils.gdNoFill) != 0) {
+				if ((style & GdUtils.gdEdged) != 0) {
+					drawLine(cx, cy, lx, ly, color);
+					drawLine(cx, cy, fx, fy, color);
+				}
+				drawLine(fx, fy, lx, ly, color);
+			} else {
+				pts[0].x = fx;
+				pts[0].y = fy;
+				pts[1].x = lx;
+				pts[1].y = ly;
+				pts[2].x = cx;
+				pts[2].y = cy;
+				fillPolygon(pts, color);
+			}
+		} else {
+			if ((style & GdUtils.gdNoFill) != 0) {
+				if ((style & GdUtils.gdEdged) != 0) {
+					drawLine(cx, cy, lx, ly, color);
+					drawLine(cx, cy, fx, fy, color);
+				}
+			}
+		}
+	}
+
+	public void drawEllipse(int mx, int my, int w, int h, int c) {
+		int mx1=0,mx2=0,my1=0,my2=0;
+		long aq,bq,dx,dy,r,rx,ry;
+
+		final int a=w>>1;
+		final int b=h>>1;
+		setPixel(mx + a, my, c);
+		setPixel(mx - a, my, c);
+		mx1 = mx-a;
+		my1 = my;
+		mx2 = mx+a;
+		my2 = my;
+
+		aq = a * a;
+		bq = b * b;
+		dx = aq << 1;
+		dy = bq << 1;
+		r  = a * bq;
+		rx = r << 1;
+		ry = 0;
+		int x = a;
+		while (x > 0) {
+			if (r > 0) {
+				my1++;
+				my2--;
+				ry +=dx;
+				r  -=ry;
+			}
+			if (r <= 0) {
+				x--;
+				mx1++;
+				mx2--;
+				rx -=dy;
+				r  +=rx;
+			}
+			setPixel(mx1, my1, c);
+			setPixel(mx1, my2, c);
+			setPixel(mx2, my1, c);
+			setPixel(mx2, my2, c);
+		}
+	}
+
+
+	public void fillEllipse(final int mx, final int my, final int w, final int h, final int c) {
+		int mx1=0,mx2=0,my1=0,my2=0;
+		long aq,bq,dx,dy,r,rx,ry;
+		int i;
+		int old_y2;
+
+		final int a=w>>1;
+		final int b=h>>1;
+
+		for (int x = mx-a; x <= mx+a; x++) {
+			setPixel(x, my, c);
+		}
+
+		mx1 = mx-a;
+		my1 = my;
+		mx2 = mx+a;
+		my2 = my;
+
+		aq = a * a;
+		bq = b * b;
+		dx = aq << 1;
+		dy = bq << 1;
+		r  = a * bq;
+		rx = r << 1;
+		ry = 0;
+		int x = a;
+		old_y2=-2;
+		while (x > 0) {
+			if (r > 0) {
+				my1++;
+				my2--;
+				ry +=dx;
+				r  -=ry;
+			}
+			if (r <= 0) {
+				x--;
+				mx1++;
+				mx2--;
+				rx -=dy;
+				r  +=rx;
+			}
+			if(old_y2!=my2) {
+				for(i=mx1; i<=mx2; i++) {
+					setPixel(i, my1, c);
+				}
+			}
+			if(old_y2!=my2) {
+				for(i=mx1; i<=mx2; i++) {
+					setPixel(i, my2, c);
+				}
+			}
+			old_y2 = my2;
+		}
+	}
+
 	/* Line thickness (defaults to 1). Affects lines, ellipses,
 	   rectangles, polygons and so forth. */
 	public void setThickness(int thickness) {
@@ -2122,7 +2315,7 @@ public class GdImage {
 		}
 	}
 
-	public void gdImageFlipVertical() {
+	public void flipVertical() {
 		if (trueColor) {
 			for (int y = 0; y < sy / 2; y++) {
 				int[] row_dst = tpixels[y];
@@ -2145,7 +2338,7 @@ public class GdImage {
 		}
 	}
 
-	public void gdImageFlipHorizontal() {
+	public void flipHorizontal() {
 		if (trueColor) {
 			for (int y = 0; y < sy; y++) {
 				final int[] row = tpixels[y];
@@ -2169,9 +2362,9 @@ public class GdImage {
 		}
 	}
 
-	public void gdImageFlipBoth() {
-		gdImageFlipVertical();
-		gdImageFlipHorizontal();
+	public void flipBoth() {
+		flipVertical();
+		flipHorizontal();
 	}
 
 }
