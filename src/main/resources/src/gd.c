@@ -376,20 +376,6 @@ BGD_DECLARE(void) gdImageAABlend (gdImagePtr im)
 	(void)im;
 }
 
-static void gdImageAALine (gdImagePtr im, int x1, int y1, int x2, int y2, int col);
-
-#ifndef HAVE_LSQRT
-/* If you don't have a nice square root function for longs, you can use
-   ** this hack
- */
-long
-lsqrt (long n)
-{
-	long result = (long) sqrt ((double) n);
-	return result;
-}
-#endif
-
 /* s and e are integers modulo 360 (degrees), with 0 degrees
    being the rightmost extreme and degrees changing clockwise.
    cx and cy are the center in pixels; w and h are the horizontal
