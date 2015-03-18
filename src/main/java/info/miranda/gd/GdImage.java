@@ -1,5 +1,7 @@
 package info.miranda.gd;
 
+import java.util.Stack;
+
 import static java.lang.Math.cos;
 import static java.lang.Math.sin;
 import static java.lang.Math.sqrt;
@@ -1354,7 +1356,6 @@ public class GdImage {
 		}
 	}
 
-
 	public void fillEllipse(final int mx, final int my, final int w, final int h, final int c) {
 		int mx1=0,mx2=0,my1=0,my2=0;
 		long aq,bq,dx,dy,r,rx,ry;
@@ -1407,6 +1408,302 @@ public class GdImage {
 				}
 			}
 			old_y2 = my2;
+		}
+	}
+
+	public void fillToBorder(final int x, final int y, final int border, final int color) {
+		boolean lastBorder;
+	/* Seek left */
+		int leftLimit, rightLimit;
+		int i;
+		GdEffect restoreAlphaBleding;
+
+		if (border < 0) {
+		/* Refuse to fill to a non-solid border */
+			return;
+		}
+
+		leftLimit = (-1);
+
+		restoreAlphaBleding = alphaBlendingFlag;
+		alphaBlendingFlag = GdEffect.REPLACE;
+
+		for (i = x; (i >= 0); i--) {
+			if (getPixel(i, y) == border) {
+				break;
+			}
+			setPixel(i, y, color);
+			leftLimit = i;
+		}
+		if (leftLimit == (-1)) {
+			alphaBlendingFlag = restoreAlphaBleding;
+			return;
+		}
+	/* Seek right */
+		rightLimit = x;
+		for (i = (x + 1); (i < sx); i++) {
+		if (getPixel(i, y) == border) {
+			break;
+		}
+		setPixel(i, y, color);
+		rightLimit = i;
+	}
+	/* Look at lines above and below and start paints */
+	/* Above */
+		if (y > 0) {
+			lastBorder = true;
+			for (i = leftLimit; (i <= rightLimit); i++) {
+				int c;
+				c = getPixel(i, y - 1);
+				if (lastBorder) {
+					if ((c != border) && (c != color)) {
+						fillToBorder(i, y - 1, border, color);
+						lastBorder = false;
+					}
+				} else if ((c == border) || (c == color)) {
+					lastBorder = true;
+				}
+			}
+		}
+	/* Below */
+		if (y < ((sy) - 1)) {
+			lastBorder = true;
+			for (i = leftLimit; (i <= rightLimit); i++) {
+				int c = getPixel(i, y + 1);
+				if (lastBorder) {
+					if ((c != border) && (c != color)) {
+						fillToBorder(i, y + 1, border, color);
+						lastBorder = false;
+					}
+				} else if ((c == border) || (c == color)) {
+					lastBorder = true;
+				}
+			}
+		}
+		alphaBlendingFlag = restoreAlphaBleding;
+	}
+
+/*
+ * set the pixel at (x,y) and its 4-connected neighbors
+ * with the same pixel value to the new pixel value nc (new color).
+ * A 4-connected neighbor:  pixel above, below, left, or right of a pixel.
+ * ideas from comp.graphics discussions.
+ * For tiled fill, the use of a flag buffer is mandatory. As the tile image can
+ * contain the same color as the color to fill. To do not bloat normal filling
+ * code I added a 2nd private function.
+ */
+	private int gdImageTileGet(final int x, final int y) {
+		int tileColor;
+		if (tile == null) {
+			return -1;
+		}
+		final int srcx = x % (tile.sx);
+		final int srcy = y % (tile.sy);
+		final int p = tile.getPixel(srcx, srcy);
+		if (p == tile.transparent) {
+			tileColor = transparent;
+		} else if (trueColor) {
+			if (tile.trueColor) {
+				tileColor = p;
+			} else {
+				tileColor = GdUtils.trueColorMixAlpha(tile.getRed(p), tile.getGreen(p), tile.getBlue(p), tile.getAlpha(p));
+			}
+		} else {
+			if (tile.trueColor) {
+				tileColor = colorResolveAlpha(GdUtils.trueColorGetRed(p), GdUtils.trueColorGetGreen(p), GdUtils.trueColorGetBlue(p), GdUtils.trueColorGetAlpha(p));
+			} else {
+				tileColor = colorResolveAlpha(tile.getRed(p), tile.getGreen(p), tile.getBlue(p), tile.getAlpha(p));
+			}
+		}
+		return tileColor;
+	}
+
+	/* horizontal segment of scan line y */
+	private class FillStack {
+		private Stack<FillStack> stack = new Stack<FillStack>();
+		int y, xl, xr, dy;
+
+		public void push(final int Y, final int XL, final int XR, final int DY) {
+			final FillStack sp = new FillStack();
+			if (Y+(DY)>=0 && Y+(DY)<sy)
+			{sp.y = Y; sp.xl = XL; sp.xr = XR; sp.dy = DY;}
+			stack.push(sp);
+		}
+
+		public FillStack pop() {
+			return stack.pop();
+		}
+
+		public boolean empty() {
+			return stack.empty();
+		}
+	};
+
+/* max depth of stack */
+//	#define FILL_MAX ((int)(sy*sx)/4)
+//			#define FILL_PUSH(Y, XL, XR, DY) \
+//			if (sp<stack+FILL_MAX && Y+(DY)>=0 && Y+(DY)<wy2) \
+//	{sp->y = Y; sp->xl = XL; sp->xr = XR; sp->dy = DY; sp++;}
+//
+//	#define FILL_POP(Y, XL, XR, DY) \
+//	{sp--; Y = sp->y+(DY = sp->dy); XL = sp->xl; XR = sp->xr;}
+
+	public void gdImageFill(int x, int y, final int nc) {
+		int l, x1, x2, dy;
+		int oc;   /* old pixel value */
+
+		final GdEffect alphablending_bak;
+
+	/* stack of filled segments */
+	/* struct seg stack[FILL_MAX],*sp = stack; */
+		final FillStack stack = new FillStack();
+
+		if (!trueColor && nc > (colorsTotal - 1)) {
+			return;
+		}
+
+		alphablending_bak = alphaBlendingFlag;
+		alphaBlendingFlag = GdEffect.REPLACE;
+
+		if (nc==GdUtils.SPECIAL_COLOR_TILED) {
+			fillTiled(x, y, nc);
+			alphaBlendingFlag = alphablending_bak;
+			return;
+		}
+
+		final int wx2=sx;
+		final int wy2=sy;
+		oc = getPixel(x, y);
+		if (oc==nc || x<0 || x>wx2 || y<0 || y>wy2) {
+			alphaBlendingFlag = alphablending_bak;
+			return;
+		}
+
+	/* Do not use the 4 neighbors implementation with
+	* small images
+	*/
+		if (sx < 4) {
+			int ix = x, iy = y, c;
+			do {
+				do {
+					c = getPixel(ix, iy);
+					if (c != oc) {
+						alphaBlendingFlag = alphablending_bak;
+						return;
+					}
+					setPixel(ix, iy, nc);
+				} while(ix++ < (sx -1));
+				ix = x;
+			} while(iy++ < (sy -1));
+			alphaBlendingFlag = alphablending_bak;
+			return;
+		}
+
+		if(GdUtils.overflow2(sy, sx)) {
+			return;
+		}
+
+	/* required! */
+		stack.push(y, x, x, 1);
+	/* seed segment (popped 1st) */
+		stack.push(y + 1, x, x, -1);
+		while (!stack.empty()) {
+			final FillStack sp = stack.pop();
+			y = sp.y+(dy = sp.dy); x1 = sp.xl; x2 = sp.xr;
+
+			for (x=x1; x>=0 && getPixel(x, y)==oc; x--) {
+				setPixel(x, y, nc);
+			}
+			if (x>=x1) {
+				goto skip;
+			}
+			l = x+1;
+
+		/* leak on left? */
+			if (l<x1) {
+				stack.push(y, l, x1-1, -dy);
+			}
+			x = x1+1;
+			do {
+				for (; x<=wx2 && getPixel(x, y)==oc; x++) {
+					setPixel(x, y, nc);
+				}
+				stack.push(y, l, x-1, dy);
+			/* leak on right? */
+				if (x>x2+1) {
+					stack.push(y, x2+1, x-1, -dy);
+				}
+				skip:
+				for (x++; x<=x2 && (getPixel(x, y)!=oc); x++);
+
+				l = x;
+			} while (x<=x2);
+		}
+
+		alphaBlendingFlag = alphablending_bak;
+	}
+
+	private void fillTiled(int x, int y, int nc) {
+		int l, x1, x2, dy;
+		int oc;   /* old pixel value */
+	/* stack of filled segments */
+		final FillStack stack = new FillStack();
+		boolean[] pts = new boolean[sx * sy];
+
+		if (tile == null) {
+			return;
+		}
+
+		final int wx2=sx;
+		final int wy2=sy;
+
+		if(GdUtils.overflow2(sy, sx)) {
+			return;
+		}
+
+		oc = getPixel(x, y);
+
+	/* required! */
+		stack.push(y,x, x, 1);
+	/* seed segment (popped 1st) */
+		stack.push(y+1, x, x, -1);
+		while (!stack.empty()) {
+			final FillStack sp = stack.pop();
+			y = sp.y+(dy = sp.dy); x1 = sp.xl; x2 = sp.xr;
+			for (x=x1; x>=0 && (!pts[y + x*wx2] && getPixel(x,y)==oc); x--) {
+				nc = gdImageTileGet(x,y);
+				pts[y + x*wx2]=true;
+				setPixel(x, y, nc);
+			}
+			if (x>=x1) {
+				goto skip;
+			}
+			l = x+1;
+
+		/* leak on left? */
+			if (l<x1) {
+				stack.push(y, l, x1-1, -dy);
+			}
+			x = x1+1;
+			do {
+				for (; x<wx2 && (!pts[y + x*wx2] && getPixel(x, y)==oc) ; x++) {
+					if (pts[y + x*wx2]) {
+					/* we should never be here */
+						break;
+					}
+					nc = gdImageTileGet(x,y);
+					pts[y + x*wx2]=true;
+					setPixel(x, y, nc);
+				}
+				stack.push(y, l, x-1, dy);
+			/* leak on right? */
+				if (x>x2+1) {
+					stack.push(y, x2+1, x-1, -dy);
+				}
+				skip:
+				for (x++; x<=x2 && (pts[y + x*wx2] || getPixel(x, y)!=oc); x++);
+				l = x;
+			} while (x<=x2);
 		}
 	}
 
