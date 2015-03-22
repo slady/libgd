@@ -1615,15 +1615,19 @@ public class GdImage {
 				setPixel(x, y, nc);
 			}
 			if (x>=x1) {
-				goto skip;
-			}
-			l = x+1;
+				for (x++; x<=x2 && (getPixel(x, y)!=oc); x++);
+
+				l = x;
+			} else {
+				l = x+1;
 
 		/* leak on left? */
-			if (l<x1) {
-				stack.push(y, l, x1-1, -dy);
+				if (l<x1) {
+					stack.push(y, l, x1-1, -dy);
+				}
+				x = x1+1;
 			}
-			x = x1+1;
+
 			do {
 				for (; x<=wx2 && getPixel(x, y)==oc; x++) {
 					setPixel(x, y, nc);
@@ -1633,7 +1637,6 @@ public class GdImage {
 				if (x>x2+1) {
 					stack.push(y, x2+1, x-1, -dy);
 				}
-				skip:
 				for (x++; x<=x2 && (getPixel(x, y)!=oc); x++);
 
 				l = x;
@@ -1676,15 +1679,18 @@ public class GdImage {
 				setPixel(x, y, nc);
 			}
 			if (x>=x1) {
-				goto skip;
-			}
-			l = x+1;
+				for (x++; x<=x2 && (pts[y + x*wx2] || getPixel(x, y)!=oc); x++);
+				l = x;
+			} else {
+				l = x+1;
 
 		/* leak on left? */
-			if (l<x1) {
-				stack.push(y, l, x1-1, -dy);
+				if (l<x1) {
+					stack.push(y, l, x1-1, -dy);
+				}
+				x = x1+1;
 			}
-			x = x1+1;
+
 			do {
 				for (; x<wx2 && (!pts[y + x*wx2] && getPixel(x, y)==oc) ; x++) {
 					if (pts[y + x*wx2]) {
@@ -1700,7 +1706,6 @@ public class GdImage {
 				if (x>x2+1) {
 					stack.push(y, x2+1, x-1, -dy);
 				}
-				skip:
 				for (x++; x<=x2 && (pts[y + x*wx2] || getPixel(x, y)!=oc); x++);
 				l = x;
 			} while (x<=x2);
