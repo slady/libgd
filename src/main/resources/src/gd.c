@@ -202,6 +202,3 @@ BGD_DECLARE(void) gdImagePaletteCopy (gdImagePtr to, gdImagePtr from)
 	to->colorsTotal = from->colorsTotal;
 
 }
-
-/* end of line clipping code */
-
