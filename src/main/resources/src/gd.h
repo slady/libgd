@@ -233,9 +233,6 @@ BGD_DECLARE(char *) gdImageStringFTEx (gdImage * im, int *brect, int fg, char *f
                                        double ptsize, double angle, int x, int y,
                                        char *string, gdFTStringExtraPtr strex);
 
-/* An alternate method */
-BGD_DECLARE(int) gdImageColorClosestHWB (gdImagePtr im, int r, int g, int b);
-
 /* Converts a truecolor image to a palette-based image,
    using a high-quality two-pass quantization routine
    which attempts to preserve alpha channel information
@@ -288,19 +285,6 @@ BGD_DECLARE(int) gdImageTrueColorToPaletteSetMethod (gdImagePtr im, int method, 
   This function has effect only when GD_QUANT_LIQ method has been selected and the source image is true-color.
 */
 BGD_DECLARE(void) gdImageTrueColorToPaletteSetQuality (gdImagePtr im, int min_quality, int max_quality);
-
-/* Specifies a color index (if a palette image) or an
-   RGB color (if a truecolor image) which should be
-   considered 100% transparent. FOR TRUECOLOR IMAGES,
-   THIS IS IGNORED IF AN ALPHA CHANNEL IS BEING
-   SAVED. Use gdImageSaveAlpha(im, 0); to
-   turn off the saving of a full alpha channel in
-   a truecolor image. Note that gdImageColorTransparent
-   is usually compatible with older browsers that
-   do not understand full alpha channels well. TBB */
-BGD_DECLARE(void) gdImageColorTransparent (gdImagePtr im, int color);
-
-BGD_DECLARE(void) gdImagePaletteCopy (gdImagePtr dst, gdImagePtr src);
 
 BGD_DECLARE(void) gdImageGif (gdImagePtr im, FILE * out);
 BGD_DECLARE(void) gdImagePng (gdImagePtr im, FILE * out);

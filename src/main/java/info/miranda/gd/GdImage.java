@@ -2811,4 +2811,197 @@ public class GdImage {
 		flipHorizontal();
 	}
 
+/* This code is taken from http://www.acm.org/jgt/papers/SmithLyons96/hwb_rgb.html, an article
+ * on colour conversion to/from RBG and HWB colour systems.
+ * It has been modified to return the converted value as a * parameter.
+ */
+
+//	#define RETURN_HWB(h, w, b) {HWB->H = h; HWB->W = w; HWB->B = b; return HWB;}
+//	#define RETURN_RGB(r, g, b) {RGB->R = r; RGB->G = g; RGB->B = b; return RGB;}
+	private static double HWB_UNDEFINED = -1;
+
+	private static double MIN(final double a, final double b) {
+		return ((a)<(b)?(a):(b));
+	}
+
+	private static double MIN3(final double a,final double b,final double c) {
+		return ((a)<(b)?(MIN(a,c)):(MIN(b,c)));
+	}
+
+	private static double MAX(final double a, final double b) {
+		return ((a)<(b)?(b):(a));
+	}
+
+	private static double MAX3(final double a, final double b, final double c) {
+		return ((a)<(b)?(MAX(b,c)):(MAX(a,c)));
+	}
+
+
+	/*
+	 * Theoretically, hue 0 (pure red) is identical to hue 6 in these transforms. Pure
+	 * red always maps to 6 in this implementation. Therefore UNDEFINED can be
+	 * defined as 0 in situations where only unsigned numbers are desired.
+	 */
+	static class GdRGBType {
+		double R, G, B;
+		public GdRGBType(final double r, final double g, final double b) {
+			this.R = r/255.0; this.G = g/255.0; this.B = b/255.0;
+		}
+	}
+
+	static class GdHWBType {
+		double H, W, B;
+		public GdHWBType(final double h, final double w, final double b) {
+			this.H = h; this.W = w; this.B = b;
+		}
+	}
+
+	private static GdHWBType RGB_to_HWB(GdRGBType RGB) {
+
+	/*
+	 * RGB are each on [0, 1]. W and B are returned on [0, 1] and H is
+	 * returned on [0, 6]. Exception: H is returned UNDEFINED if W == 1 - B.
+	 */
+
+		double R = RGB.R, G = RGB.G, B = RGB.B, w, v, b, f;
+		int i;
+
+		w = MIN3(R, G, B);
+		v = MAX3(R, G, B);
+		b = 1 - v;
+		if (v == w)
+			return new GdHWBType(HWB_UNDEFINED, w, b);
+		f = (R == w) ? G - B : ((G == w) ? B - R : R - G);
+		i = (R == w) ? 3 : ((G == w) ? 5 : 1);
+		return new GdHWBType(i - f / (v - w), w, b);
+	}
+
+	static double HWB_Diff(final int r1, final int g1, final int b1, final int r2, final int g2, final int b2) {
+		double diff;
+
+		final GdRGBType RGB1 = new GdRGBType(r1, g1, b1);
+		final GdRGBType RGB2 = new GdRGBType(r2, g2, b2);
+
+		final GdHWBType HWB1 = RGB_to_HWB(RGB1);
+		final GdHWBType HWB2 = RGB_to_HWB (RGB2);
+
+	/*
+	 * I made this bit up; it seems to produce OK results, and it is certainly
+	 * more visually correct than the current RGB metric. (PJW)
+	 */
+
+		if ((HWB1.H == HWB_UNDEFINED) || (HWB2.H == HWB_UNDEFINED)) {
+			diff = 0;			/* Undefined hues always match... */
+		} else {
+			diff = (HWB1.H - HWB2.H);
+			if (diff > 3) {
+				diff = 6 - diff;	/* Remember, it's a colour circle */
+			}
+		}
+
+		diff =
+				diff * diff + (HWB1.W - HWB2.W) * (HWB1.W - HWB2.W) + (HWB1.B -
+						HWB2.B) * (HWB1.B -
+						HWB2.B);
+
+		return diff;
+	}
+
+	/* An alternate method */
+	public int colorClosestHWB(final int r, final int g, final int b) {
+		int i;
+	/* long rd, gd, bd; */
+		int ct = (-1);
+		boolean first = true;
+		double mindist = 0;
+		if (trueColor) {
+			return GdUtils.trueColorMix(r, g, b);
+		}
+		for (i = 0; (i < (colorsTotal)); i++) {
+			double dist;
+			if (open[i]) {
+				continue;
+			}
+			dist = HWB_Diff (red[i], green[i], blue[i], r, g, b);
+			if (first || (dist < mindist)) {
+				mindist = dist;
+				ct = i;
+				first = false;
+			}
+		}
+		return ct;
+	}
+
+	/* Specifies a color index (if a palette image) or an
+	   RGB color (if a truecolor image) which should be
+	   considered 100% transparent. FOR TRUECOLOR IMAGES,
+	   THIS IS IGNORED IF AN ALPHA CHANNEL IS BEING
+	   SAVED. Use gdImageSaveAlpha(im, 0); to
+	   turn off the saving of a full alpha channel in
+	   a truecolor image. Note that gdImageColorTransparent
+	   is usually compatible with older browsers that
+	   do not understand full alpha channels well. TBB */
+	public void gdImageColorTransparent(int color) {
+		if (!trueColor) {
+			if((color < -1) || (color >= GdUtils.MAX_COLORS)) {
+				return;
+			}
+			if (transparent != -1) {
+				alpha[transparent] = GdUtils.ALPHA_OPAQUE;
+			}
+			if (color != -1) {
+				alpha[color] = GdUtils.ALPHA_TRANSPARENT;
+			}
+		}
+		transparent = color;
+	}
+
+	public static void paletteCopy(GdImage to, GdImage from) {
+		int i;
+		int x, y, p;
+		int[] xlate = new int[256];
+		if (to.trueColor) {
+			return;
+		}
+		if (from.trueColor) {
+			return;
+		}
+
+		for (i = 0; i < 256; i++) {
+			xlate[i] = -1;
+		};
+
+		for (y = 0; y < (to.sy); y++) {
+			for (x = 0; x < (to.sx); x++) {
+			/* Optimization: no gdImageGetPixel */
+				p = to.pixels[y][x];
+				if (xlate[p] == -1) {
+				/* This ought to use HWB, but we don't have an alpha-aware
+				   version of that yet. */
+					xlate[p] = from.findColorClosestAlpha(to.red[p], to.green[p], to.blue[p], to.alpha[p]);
+				/*printf("Mapping %d (%d, %d, %d, %d) to %d (%d, %d, %d, %d)\n", */
+				/*      p,  to->red[p], to->green[p], to->blue[p], to->alpha[p], */
+				/*      xlate[p], from->red[xlate[p]], from->green[xlate[p]], from->blue[xlate[p]], from->alpha[xlate[p]]); */
+				};
+			/* Optimization: no gdImageSetPixel */
+				to.pixels[y][x] = xlate[p];
+			};
+		};
+
+		for (i = 0; (i < (from.colorsTotal)); i++) {
+		/*printf("Copying color %d (%d, %d, %d, %d)\n", i, from->red[i], from->blue[i], from->green[i], from->alpha[i]); */
+			to.red[i] = from.red[i];
+			to.blue[i] = from.blue[i];
+			to.green[i] = from.green[i];
+			to.alpha[i] = from.alpha[i];
+			to.open[i] = false;
+		};
+
+		for (i = from.colorsTotal; (i < to.colorsTotal); i++) {
+			to.open[i] = true;
+		};
+
+		to.colorsTotal = from.colorsTotal;
+	}
+
 }
