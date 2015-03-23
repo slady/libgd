@@ -1,5 +1,7 @@
 package info.miranda.gd;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Stack;
 
 import static java.lang.Math.cos;
@@ -178,6 +180,10 @@ public class GdImage {
 		} else {
 			return p;
 		}
+	}
+
+	public int getPalettePixel(final int x, final int y) {
+		return pixels[(y)][(x)];
 	}
 
 	/* This function accepts truecolor pixel values only. The
@@ -2560,6 +2566,142 @@ public class GdImage {
 		final int dist = dr * dr + dg * dg + db * db + da * da;
 
 		return (100.0 * dist / 195075) < threshold;
+	}
+
+	public int colorReplace(final int src, final int dst) {
+		if (src == dst) {
+			return 0;
+		}
+
+		int n = 0;
+
+		if (trueColor) {
+			for (int y = cy1; y <= cy2; y++) {
+				for (int x = cx1; x <= cx2; x++) {
+					if (getTrueColorPixel(x, y) == src) {
+						setPixel(x, y, dst);
+						n++;
+					}
+				}
+			}
+		} else {
+			for (int y = cy1; y <= cy2; y++) {
+				for (int x = cx1; x <= cx2; x++) {
+					if (getPalettePixel(x, y) == src) {
+						setPixel(x, y, dst);
+						n++;
+					}
+				}
+			}
+		}
+
+		return n;
+	}
+
+	public int colorReplaceThreshold(final int src, final int dst, final float threshold) {
+		if (src == dst) {
+			return 0;
+		}
+
+		int n = 0;
+
+		if (trueColor) {
+			for (int y = cy1; y <= cy2; y++) {
+				for (int x = cx1; x <= cx2; x++) {
+					if (isColorMatch(src, getTrueColorPixel(x, y), threshold)) {
+						setPixel(x, y, dst);
+						n++;
+					}
+				}
+			}
+		} else {
+			for (int y = cy1; y <= cy2; y++) {
+				for (int x = cx1; x <= cx2; x++) {
+					if (isColorMatch(src, getPalettePixel(x, y), threshold)) {
+						setPixel(x, y, dst);
+						n++;
+					}
+				}
+			}
+		}
+
+		return n;
+	}
+
+	public int colorReplaceArray(final int[] src, final int[] dst) {
+		if (src.length != dst.length || src == dst) {
+			return 0;
+		}
+		if (src.length == 1) {
+			return colorReplace(src[0], dst[0]);
+		}
+
+		final Map<Integer, Integer> base = new HashMap<Integer, Integer>();
+		for (int i = 0; i < src.length; i++) {
+			base.put(src[i], dst[i]);
+		}
+
+		int n = 0;
+
+		if (trueColor) {
+			for (int y = cy1; y <= cy2; y++) {
+				for (int x = cx1; x <= cx2; x++) {
+					final int c = getTrueColorPixel(x, y);
+					if (base.containsKey(c)) {
+						setPixel(x, y, base.get(c));
+						n++;
+					}
+				}
+			}
+		} else {
+			for (int y = cy1; y <= cy2; y++) {
+				for (int x = cx1; x <= cx2; x++) {
+					final int c = getPalettePixel(x, y);
+					if (base.containsKey(c)) {
+						setPixel(x, y, base.get(c));
+						n++;
+					}
+				}
+			}
+		}
+
+		return n;
+	}
+
+	public int colorReplaceCallback(GdCallbackImageColor callback) {
+		if (callback == null) {
+			return 0;
+		}
+
+		int n = 0;
+
+		if (trueColor) {
+			for (int y = cy1; y <= cy2; y++) {
+				for (int x = cx1; x <= cx2; x++) {
+					final int c = getTrueColorPixel(x, y);
+					final int d = callback.callbackImageColor(this, c);
+					if (d != c) {
+						setPixel(x, y, d);
+						n++;
+					}
+				}
+			}
+		} else { /* palette */
+			int len = 0;
+
+			int[] sarr = new int[colorsTotal];
+			for (int c = 0; c < colorsTotal; c++) {
+				if (!open[c]) {
+					sarr[len++] = c;
+				}
+			}
+			final int[] darr = new int[len];
+			for (int k = 0; k < len; k++) {
+				darr[k] = callback.callbackImageColor(this, sarr[k]);
+			}
+			n = colorReplaceArray(sarr, darr);
+		}
+		return n;
 	}
 
 	public void writeChar(final GdFont f, final int x, final int y, final int c, final int color) {
