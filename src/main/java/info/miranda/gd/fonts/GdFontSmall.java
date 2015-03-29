@@ -1,4 +1,6 @@
-package info.miranda.gd;
+package info.miranda.gd.fonts;
+
+import info.miranda.gd.GdFont;
 
 /*
 	This is a header file for gd font, generated using

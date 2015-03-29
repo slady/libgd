@@ -1,4 +1,4 @@
-package info.miranda.gd;
+package info.miranda.gd.utils;
 
 public class GdRect {
 	int x, y;

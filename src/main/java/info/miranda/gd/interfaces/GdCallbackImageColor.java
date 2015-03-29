@@ -1,4 +1,6 @@
-package info.miranda.gd;
+package info.miranda.gd.interfaces;
+
+import info.miranda.gd.GdImage;
 
 public interface GdCallbackImageColor {
 

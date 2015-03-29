@@ -1,8 +1,7 @@
 package info.miranda.gd.example;
 
-import info.miranda.gd.GdDisposal;
 import info.miranda.gd.GdImage;
-import info.miranda.gd.GdImageColorType;
+import info.miranda.gd.enums.GdImageColorType;
 
 import java.io.File;
 

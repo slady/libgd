@@ -1,4 +1,4 @@
-package info.miranda.gd;
+package info.miranda.gd.enums;
 
 public enum GdAffineStandardMatrix {
 	GD_AFFINE_TRANSLATE,

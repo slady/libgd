@@ -1,4 +1,4 @@
-package info.miranda.gd;
+package info.miranda.gd.interfaces;
 
 /* Interpolation function ptr */
 public interface GdInterpolationMethodInterface {
