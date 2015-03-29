@@ -97,6 +97,7 @@ public class GdUtils {
    for MUCH more flexible line drawing. Also see
    setBrush(). */
 	public static final int DASH_SIZE = 4;
+	public static final int MAXPATHLEN = 4096;
 
 	public static final int COS_T[] = {
 			1024,
