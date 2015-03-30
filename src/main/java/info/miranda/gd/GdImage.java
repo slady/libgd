@@ -4,7 +4,9 @@ import info.miranda.gd.enums.GdAxis;
 import info.miranda.gd.enums.GdEffect;
 import info.miranda.gd.enums.GdImageColorType;
 import info.miranda.gd.enums.GdInterpolationMethod;
+import info.miranda.gd.filter.*;
 import info.miranda.gd.interfaces.GdCallbackImageColor;
+import info.miranda.gd.interfaces.GdFilterInterface;
 import info.miranda.gd.interfaces.GdInterpolation;
 import info.miranda.gd.utils.GdRect;
 
@@ -119,7 +121,7 @@ public class GdImage {
 	   Value from 1 to 100, 1 = ugly, 100 = perfect. Applicable to GD_QUANT_LIQ.*/
 	int paletteQuantizationMaxQuality;
 	GdInterpolationMethod interpolation_id;
-	GdInterpolation interpolation;
+	GdFilterInterface interpolation;
 
 	/* 2.0.12: this now checks the clipping rectangle */
 	private boolean isBoundsSafe(final int x, final int y) {
@@ -3145,11 +3147,7 @@ TODO:
 
 /* Each core filter has its own radius */
 	private static final double DEFAULT_FILTER_BICUBIC				= 3.0;
-	private static final double DEFAULT_FILTER_BOX					= 0.5;
-	private static final double DEFAULT_FILTER_GENERALIZED_CUBIC	= 0.5;
 	private static final double DEFAULT_FILTER_RADIUS				= 1.0;
-	private static final double DEFAULT_LANCZOS8_RADIUS				= 8.0;
-	private static final double DEFAULT_LANCZOS3_RADIUS				= 3.0;
 	private static final double DEFAULT_HERMITE_RADIUS				= 1.0;
 	private static final double DEFAULT_BOX_RADIUS					= 0.5;
 	private static final double DEFAULT_TRIANGLE_RADIUS				= 1.0;
@@ -3167,428 +3165,8 @@ TODO:
 	private static final double DEFAULT_SINC_RADIUS					= 1.0;
 	private static final double DEFAULT_WELSH_RADIUS				= 1.0;
 
-	private static double KernelBessel_J1(final double x) {
-		double p, q;
-
-		final double
-			Pone[] =
-			{
-					0.581199354001606143928050809e+21,
-					-0.6672106568924916298020941484e+20,
-					0.2316433580634002297931815435e+19,
-					-0.3588817569910106050743641413e+17,
-					0.2908795263834775409737601689e+15,
-					-0.1322983480332126453125473247e+13,
-					0.3413234182301700539091292655e+10,
-					-0.4695753530642995859767162166e+7,
-					0.270112271089232341485679099e+4
-			},
-			Qone[] =
-					{
-							0.11623987080032122878585294e+22,
-							0.1185770712190320999837113348e+20,
-							0.6092061398917521746105196863e+17,
-							0.2081661221307607351240184229e+15,
-							0.5243710262167649715406728642e+12,
-							0.1013863514358673989967045588e+10,
-							0.1501793594998585505921097578e+7,
-							0.1606931573481487801970916749e+4,
-							0.1e+1
-					};
-
-		p = Pone[8];
-		q = Qone[8];
-		for (int i=7; i >= 0; i--)
-		{
-			p = p*x*x+Pone[i];
-			q = q*x*x+Qone[i];
-		}
-		return (double)(p/q);
-	}
-
-	private static double KernelBessel_P1(final double x)
-	{
-		double p, q;
-
-		final double
-			Pone[] =
-			{
-					0.352246649133679798341724373e+5,
-					0.62758845247161281269005675e+5,
-					0.313539631109159574238669888e+5,
-					0.49854832060594338434500455e+4,
-					0.2111529182853962382105718e+3,
-					0.12571716929145341558495e+1
-			},
-			Qone[] =
-					{
-							0.352246649133679798068390431e+5,
-							0.626943469593560511888833731e+5,
-							0.312404063819041039923015703e+5,
-							0.4930396490181088979386097e+4,
-							0.2030775189134759322293574e+3,
-							0.1e+1
-					};
-
-		p = Pone[5];
-		q = Qone[5];
-		for (int i=4; i >= 0; i--)
-		{
-			p = p*(8.0/x)*(8.0/x)+Pone[i];
-			q = q*(8.0/x)*(8.0/x)+Qone[i];
-		}
-		return (double)(p/q);
-	}
-
-	private static double KernelBessel_Q1(final double x)
-	{
-		double p, q;
-
-		final double
-			Pone[] =
-			{
-					0.3511751914303552822533318e+3,
-					0.7210391804904475039280863e+3,
-					0.4259873011654442389886993e+3,
-					0.831898957673850827325226e+2,
-					0.45681716295512267064405e+1,
-					0.3532840052740123642735e-1
-			},
-			Qone[] =
-					{
-							0.74917374171809127714519505e+4,
-							0.154141773392650970499848051e+5,
-							0.91522317015169922705904727e+4,
-							0.18111867005523513506724158e+4,
-							0.1038187585462133728776636e+3,
-							0.1e+1
-					};
-
-		p = Pone[5];
-		q = Qone[5];
-		for (int i=4; i >= 0; i--)
-		{
-			p = p*(8.0/x)*(8.0/x)+Pone[i];
-			q = q*(8.0/x)*(8.0/x)+Qone[i];
-		}
-		return (double)(p/q);
-	}
-
-	private static double KernelBessel_Order1(double x)
-	{
-		double p, q;
-
-		if (x == 0.0)
-			return (0.0f);
-		p = x;
-		if (x < 0.0)
-			x=(-x);
-		if (x < 8.0)
-			return (p*KernelBessel_J1(x));
-		q = (double)sqrt(2.0f/(PI*x))*(double)(KernelBessel_P1(x)*(1.0f/sqrt(2.0f)*(sin(x)-cos(x)))-8.0f/x*KernelBessel_Q1(x)*
-				(-1.0f/sqrt(2.0f)*(sin(x)+cos(x))));
-		if (p < 0.0f)
-			q = (-q);
-		return (q);
-	}
-
-	private static double filter_bessel(final double x)
-	{
-		if (x == 0.0f)
-			return (double)(PI/4.0f);
-		return (KernelBessel_Order1((double)PI*x)/(2.0f*x));
-	}
-
-
-	private static double filter_blackman(final double x)
-	{
-		return (0.42f+0.5f*(double)cos(PI*x)+0.08f*(double)cos(2.0f*PI*x));
-	}
-
-	/**
-	 * Bicubic interpolation kernel (a=-1):
-	 \verbatim
-	 /
-	 | 1-2|t|**2+|t|**3          , if |t| < 1
-	 h(t) = | 4-8|t|+5|t|**2-|t|**3     , if 1<=|t|<2
-	 | 0                         , otherwise
-	 \
-	 \endverbatim
-	 * ***bd*** 2.2004
-	 */
-	private static double filter_bicubic(final double t)
-	{
-		final double abs_t = (double)abs(t);
-		final double abs_t_sq = abs_t * abs_t;
-		if (abs_t<1) return 1-2*abs_t_sq+abs_t_sq*abs_t;
-		if (abs_t<2) return 4 - 8*abs_t +5*abs_t_sq - abs_t_sq*abs_t;
-		return 0;
-	}
-
-	/**
-	 * Generalized cubic kernel (for a=-1 it is the same as BicubicKernel):
-	 \verbatim
-	 /
-	 | (a+2)|t|**3 - (a+3)|t|**2 + 1     , |t| <= 1
-	 h(t) = | a|t|**3 - 5a|t|**2 + 8a|t| - 4a   , 1 < |t| <= 2
-	 | 0                                 , otherwise
-	 \
-	 \endverbatim
-	 * Often used values for a are -1 and -1/2.
-	 */
-	private static double filter_generalized_cubic(final double t)
-	{
-		final double a = -DEFAULT_FILTER_GENERALIZED_CUBIC;
-		double abs_t = (double)abs(t);
-		double abs_t_sq = abs_t * abs_t;
-		if (abs_t < 1) return (a + 2) * abs_t_sq * abs_t - (a + 3) * abs_t_sq + 1;
-		if (abs_t < 2) return a * abs_t_sq * abs_t - 5 * a * abs_t_sq + 8 * a * abs_t - 4 * a;
-		return 0;
-	}
-
-	/* CubicSpline filter, default radius 2 */
-	private static double filter_cubic_spline(final double x1)
-	{
-		final double x = x1 < 0.0 ? -x1 : x1;
-
-		if (x < 1.0 ) {
-			final double x2 = x*x;
-
-			return (0.5 * x2 * x - x2 + 2.0 / 3.0);
-		}
-		if (x < 2.0) {
-			return (pow(2.0 - x, 3.0)/6.0);
-		}
-		return 0;
-	}
-
-	/* CubicConvolution filter, default radius 3 */
-	private static double filter_cubic_convolution(final double x1)
-	{
-		final double x = x1 < 0.0 ? -x1 : x1;
-		final double x2 = x1 * x1;
-		final double x2_x = x2 * x;
-
-		if (x <= 1.0) return ((4.0 / 3.0)* x2_x - (7.0 / 3.0) * x2 + 1.0);
-		if (x <= 2.0) return (- (7.0 / 12.0) * x2_x + 3 * x2 - (59.0 / 12.0) * x + 2.5);
-		if (x <= 3.0) return ( (1.0/12.0) * x2_x - (2.0 / 3.0) * x2 + 1.75 * x - 1.5);
-		return 0;
-	}
-
-	private static double filter_box(double x) {
-		if (x < - DEFAULT_FILTER_BOX)
-			return 0.0f;
-		if (x < DEFAULT_FILTER_BOX)
-			return 1.0f;
-		return 0.0f;
-	}
-
-	private static double filter_catmullrom(final double x)
-	{
-		if (x < -2.0)
-			return(0.0f);
-		if (x < -1.0)
-			return(0.5f*(4.0f+x*(8.0f+x*(5.0f+x))));
-		if (x < 0.0)
-			return(0.5f*(2.0f+x*x*(-5.0f-3.0f*x)));
-		if (x < 1.0)
-			return(0.5f*(2.0f+x*x*(-5.0f+3.0f*x)));
-		if (x < 2.0)
-			return(0.5f*(4.0f+x*(-8.0f+x*(5.0f-x))));
-		return(0.0f);
-	}
-
-	private static double filter_filter(double t)
-	{
-	/* f(t) = 2|t|^3 - 3|t|^2 + 1, -1 <= t <= 1 */
-		if(t < 0.0) t = -t;
-		if(t < 1.0) return((2.0 * t - 3.0) * t * t + 1.0);
-		return(0.0);
-	}
-
-	/* Lanczos8 filter, default radius 8 */
-	private static double filter_lanczos8(final double x1)
-	{
-		final double x = x1 < 0.0 ? -x1 : x1;
-		final double R = DEFAULT_LANCZOS8_RADIUS;
-
-		if ( x == 0.0) return 1;
-
-		if ( x < R) {
-			return R * sin(x*PI) * sin(x * PI/ R) / (x * PI * x * PI);
-		}
-		return 0.0;
-	}
-
-	/* Lanczos3 filter, default radius 3 */
-	private static double filter_lanczos3(final double x1)
-	{
-		final double x = x1 < 0.0 ? -x1 : x1;
-		final double R = DEFAULT_LANCZOS3_RADIUS;
-
-		if ( x == 0.0) return 1;
-
-		if ( x < R)
-		{
-			return R * sin(x*PI) * sin(x * PI / R) / (x * PI * x * PI);
-		}
-		return 0.0;
-	}
-
-	/* Hermite filter, default radius 1 */
-	private static double filter_hermite(final double x1)
-	{
-		final double x = x1 < 0.0 ? -x1 : x1;
-
-		if (x < 1.0) return ((2.0 * x - 3) * x * x + 1.0 );
-
-		return 0.0;
-	}
-
-	/* Trangle filter, default radius 1 */
-	private static double filter_triangle(final double x1)
-	{
-		final double x = x1 < 0.0 ? -x1 : x1;
-		if (x < 1.0) return (1.0 - x);
-		return 0.0;
-	}
-
-	/* Bell filter, default radius 1.5 */
-	private static double filter_bell(final double x1)
-	{
-		final double x = x1 < 0.0 ? -x1 : x1;
-
-		if (x < 0.5) return (0.75 - x*x);
-		if (x < 1.5) return (0.5 * pow(x - 1.5, 2.0));
-		return 0.0;
-	}
-
-	/* Mitchell filter, default radius 2.0 */
-	private static double filter_mitchell(final double x)
-	{
-		final double KM_B = (1.0f/3.0f);
-		final double KM_C = (1.0f/3.0f);
-		final double KM_P0 = ((  6.0f - 2.0f * KM_B ) / 6.0f);
-		final double KM_P2 = ((-18.0f + 12.0f * KM_B + 6.0f * KM_C) / 6.0f);
-		final double KM_P3 = (( 12.0f - 9.0f  * KM_B - 6.0f * KM_C) / 6.0f);
-		final double KM_Q0 = ((  8.0f * KM_B + 24.0f * KM_C) / 6.0f);
-		final double KM_Q1 = ((-12.0f * KM_B - 48.0f * KM_C) / 6.0f);
-		final double KM_Q2 = ((  6.0f * KM_B + 30.0f * KM_C) / 6.0f);
-		final double KM_Q3 = (( -1.0f * KM_B -  6.0f * KM_C) / 6.0f);
-
-		if (x < -2.0)
-			return(0.0f);
-		if (x < -1.0)
-			return(KM_Q0-x*(KM_Q1-x*(KM_Q2-x*KM_Q3)));
-		if (x < 0.0f)
-			return(KM_P0+x*x*(KM_P2-x*KM_P3));
-		if (x < 1.0f)
-			return(KM_P0+x*x*(KM_P2+x*KM_P3));
-		if (x < 2.0f)
-			return(KM_Q0+x*(KM_Q1+x*(KM_Q2+x*KM_Q3)));
-		return(0.0f);
-	}
-
-
-
-	/* Cosine filter, default radius 1 */
-	private static double filter_cosine(final double x)
-	{
-		if ((x >= -1.0) && (x <= 1.0)) return ((cos(x * PI) + 1.0)/2.0);
-
-		return 0;
-	}
-
-	/* Quadratic filter, default radius 1.5 */
-	private static double filter_quadratic(final double x1)
-	{
-		final double x = x1 < 0.0 ? -x1 : x1;
-
-		if (x <= 0.5) return (- 2.0 * x * x + 1);
-		if (x <= 1.5) return (x * x - 2.5* x + 1.5);
-		return 0.0;
-	}
-
-	private static double filter_bspline(final double x)
-	{
-		if (x>2.0f) {
-			return 0.0f;
-		} else {
-			double a, b, c, d;
-		/* Was calculated anyway cause the "if((x-1.0f) < 0)" */
-			final double xm1 = x - 1.0f;
-			final double xp1 = x + 1.0f;
-			final double xp2 = x + 2.0f;
-
-			if ((xp2) <= 0.0f) a = 0.0f; else a = xp2*xp2*xp2;
-			if ((xp1) <= 0.0f) b = 0.0f; else b = xp1*xp1*xp1;
-			if (x <= 0) c = 0.0f; else c = x*x*x;
-			if ((xm1) <= 0.0f) d = 0.0f; else d = xm1*xm1*xm1;
-
-			return (0.16666666666666666667f * (a - (4.0f * b) + (6.0f * c) - (4.0f * d)));
-		}
-	}
-
-	/* QuadraticBSpline filter, default radius 1.5 */
-	private static double filter_quadratic_bspline(final double x1)
-	{
-		final double x = x1 < 0.0 ? -x1 : x1;
-
-		if (x <= 0.5) return (- x * x + 0.75);
-		if (x <= 1.5) return (0.5 * x * x - 1.5 * x + 1.125);
-		return 0.0;
-	}
-
-	private static double filter_gaussian(final double x)
-	{
-	/* return(exp((double) (-2.0 * x * x)) * sqrt(2.0 / PI)); */
-		return (double)(exp(-2.0f * x * x) * 0.79788456080287f);
-	}
-
-	private static double filter_hanning(final double x)
-	{
-	/* A Cosine windowing function */
-		return(0.5 + 0.5 * cos(PI * x));
-	}
-
-	private static double filter_hamming(final double x)
-	{
-	/* should be
-	(0.54+0.46*cos(PI*(double) x));
-	but this approximation is sufficient */
-		if (x < -1.0f)
-			return 0.0f;
-		if (x < 0.0f)
-			return 0.92f*(-2.0f*x-3.0f)*x*x+1.0f;
-		if (x < 1.0f)
-			return 0.92f*(2.0f*x-3.0f)*x*x+1.0f;
-		return 0.0f;
-	}
-
-	private static double filter_power(final double x)
-	{
-		final double a = 2.0f;
-		if (abs(x)>1) return 0.0f;
-		return (1.0f - (double)abs(pow(x, a)));
-	}
-
-	private static double filter_sinc(final double x)
-	{
-	/* X-scaled Sinc(x) function. */
-		if (x == 0.0) return(1.0);
-		return (sin(PI * (double) x) / (PI * (double) x));
-	}
-
-	private static double filter_welsh(final double x)
-	{
-	/* Welsh parabolic windowing filter */
-		if (x <  1.0)
-			return(1 - x*x);
-		return(0.0);
-	}
-
 /* Copied from upstream's libgd */
-	private static int _color_blend (final int dst, final int src)
+	public int _color_blend (final int dst, final int src)
 	{
 		final int src_alpha = GdUtils.trueColorGetAlpha(src);
 
@@ -3821,8 +3399,8 @@ TODO:
 		}
 		if (this.interpolation != null) {
 			for (i=0; i<4; i++) {
-				kernel_x[i] = (double) this.interpolation.interpolate((double) (xi + i - 1 - x));
-				kernel_y[i] = (double) this.interpolation.interpolate((double)(yi+i-1-y));
+				kernel_x[i] = (double) this.interpolation.filter((double) (xi + i - 1 - x));
+				kernel_y[i] = (double) this.interpolation.filter((double)(yi+i-1-y));
 			}
 		} else {
 			return -1;
@@ -5478,60 +5056,59 @@ TODO:
 
 		/* generic versions*/
 			case GD_BELL:
-				this.interpolation = filter_bell;
+				this.interpolation = new GdFilterBell();
 				break;
 			case GD_BESSEL:
-				this.interpolation = filter_bessel;
+				this.interpolation = new GdFilterBessel();
 				break;
 			case GD_BICUBIC:
-				this.interpolation = filter_bicubic;
+				this.interpolation = new GdFilterBicubic();
 				break;
 			case GD_BLACKMAN:
-				this.interpolation = filter_blackman;
+				this.interpolation = new GdFilterBlackman();
 				break;
 			case GD_BOX:
-				this.interpolation = filter_box;
+				this.interpolation = new GdFilterBox();
 				break;
 			case GD_BSPLINE:
-				this.interpolation = filter_bspline;
+				this.interpolation = new GdFilterBspline();
 				break;
 			case GD_CATMULLROM:
-				this.interpolation = filter_catmullrom;
+				this.interpolation = new GdFilterCatmullrom();
 				break;
 			case GD_GAUSSIAN:
-				this.interpolation = filter_gaussian;
+				this.interpolation = new GdFilterGaussian();
 				break;
 			case GD_GENERALIZED_CUBIC:
-				this.interpolation = filter_generalized_cubic;
+				this.interpolation = new GdFilterGeneralizedCubic();
 				break;
 			case GD_HERMITE:
-				this.interpolation = filter_hermite;
+				this.interpolation = new GdFilterHermite();
 				break;
 			case GD_HAMMING:
-				this.interpolation = filter_hamming;
+				this.interpolation = new GdFilterHamming();
 				break;
 			case GD_HANNING:
-				this.interpolation = filter_hanning;
+				this.interpolation = new GdFilterHanning();
 				break;
 			case GD_MITCHELL:
-				this.interpolation = filter_mitchell;
+				this.interpolation = new GdFilterMitchell();
 				break;
 			case GD_POWER:
-				this.interpolation = filter_power;
+				this.interpolation = new GdFilterPower();
 				break;
 			case GD_QUADRATIC:
-				this.interpolation = filter_quadratic;
+				this.interpolation = new GdFilterQuadratic();
 				break;
 			case GD_SINC:
-				this.interpolation = filter_sinc;
+				this.interpolation = new GdFilterSinc();
 				break;
 			case GD_TRIANGLE:
-				this.interpolation = filter_triangle;
+				this.interpolation = new GdFilterTriangle();
 				break;
 
 			default:
 				return 0;
-			break;
 		}
 		this.interpolation_id = id;
 		return 1;
