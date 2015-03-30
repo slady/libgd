@@ -1,15 +1,24 @@
 package info.miranda.gd;
 
+import info.miranda.gd.enums.GdAxis;
 import info.miranda.gd.enums.GdEffect;
 import info.miranda.gd.enums.GdImageColorType;
 import info.miranda.gd.enums.GdInterpolationMethod;
 import info.miranda.gd.interfaces.GdCallbackImageColor;
+import info.miranda.gd.interfaces.GdInterpolation;
+import info.miranda.gd.utils.GdRect;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Stack;
 
+import static java.lang.Math.PI;
+import static java.lang.Math.abs;
+import static java.lang.Math.exp;
+import static java.lang.Math.ceil;
 import static java.lang.Math.cos;
+import static java.lang.Math.floor;
+import static java.lang.Math.pow;
 import static java.lang.Math.sin;
 import static java.lang.Math.sqrt;
 
@@ -110,7 +119,7 @@ public class GdImage {
 	   Value from 1 to 100, 1 = ugly, 100 = perfect. Applicable to GD_QUANT_LIQ.*/
 	int paletteQuantizationMaxQuality;
 	GdInterpolationMethod interpolation_id;
-//	interpolation_method interpolation;
+	GdInterpolation interpolation;
 
 	/* 2.0.12: this now checks the clipping rectangle */
 	private boolean isBoundsSafe(final int x, final int y) {
@@ -2053,7 +2062,7 @@ public class GdImage {
 		dst.paletteQuantizationMinQuality = this.paletteQuantizationMinQuality;
 
 		dst.interpolation_id = this.interpolation_id;
-//		dst.interpolation    = this.interpolation;
+		dst.interpolation    = this.interpolation;
 
 		if (this.brush != null) {
 			dst.brush = this.brush.imageClone();
@@ -3063,79 +3072,105 @@ TODO:
  - Add scale support for a portion only of an image (equivalent of copyresized/resampled)
  */
 
-	#define CLAMP(x, low, high)  (((x) > (high)) ? (high) : (((x) < (low)) ? (low) : (x)))
+	public int CLAMP(final int x, final int low, final int high) {
+		return (((x) > (high)) ? (high) : (((x) < (low)) ? (low) : (x)));
+	}
 
 /* only used here, let do a generic fixed point integers later if required by other
    part of GD */
-	typedef long gdFixed;
+//	typedef long gdFixed;
 /* Integer to fixed point */
-	#define gd_itofx(x) ((x) << 8)
+	private static long gd_itofx(final int x) {
+		return ((x) << 8);
+	}
 
 /* Float to fixed point */
-			#define gd_ftofx(x) (long)((x) * 256)
+	private static long gd_ftofx(final float x) {
+		return (long)((x) * 256);
+	}
 
 /*  Double to fixed point */
-			#define gd_dtofx(x) (long)((x) * 256)
+	private static long gd_dtofx(final double x) {
+		return (long)((x) * 256);
+	}
 
 /* Fixed point to integer */
-			#define gd_fxtoi(x) ((x) >> 8)
+	private static int gd_fxtoi(final long x) {
+		return (int) ((x) >> 8);
+	}
 
 /* Fixed point to float */
-			# define gd_fxtof(x) ((float)(x) / 256)
+	private static float gd_fxtof(final long x) {
+		return ((float)(x) / 256);
+	}
 
 /* Fixed point to double */
-			#define gd_fxtod(x) ((double)(x) / 256)
+	private static double gd_fxtod(final long x) {
+		return ((double)(x) / 256);
+	}
 
 /* Multiply a fixed by a fixed */
-			#define gd_mulfx(x,y) (((x) * (y)) >> 8)
+	private static long gd_mulfx(final long x, final long y) {
+		return (((x) * (y)) >> 8);
+	}
 
 /* Divide a fixed by a fixed */
-			#define gd_divfx(x,y) (((x) << 8) / (y))
+	private static long gd_divfx(final long x, final long y) {
+		return (((x) << 8) / (y));
+	}
 
-	typedef struct
-	{
-		double *Weights;  /* Normalized weights of neighboring pixels */
+	private static class ContributionType {
+		double[] Weights;  /* Normalized weights of neighboring pixels */
 		int Left,Right;   /* Bounds of source pixels window */
-	} ContributionType;  /* Contirbution information for a single pixel */
 
-	typedef struct
-	{
-		ContributionType *ContribRow; /* Row (or column) of contribution weights */
-		unsigned int WindowSize,      /* Filter window size (of affecting source pixels) */
+		public ContributionType(final int windows_size) {
+			this.Weights = new double[windows_size];
+		}
+	}  /* Contirbution information for a single pixel */
+
+	private static class LineContribType {
+		ContributionType[] ContribRow; /* Row (or column) of contribution weights */
+		int WindowSize,      /* Filter window size (of affecting source pixels) */
 			LineLength;      /* Length of line (no. or rows / cols) */
-	} LineContribType;
+
+		public LineContribType(final int line_length, final int windows_size) {
+			this.WindowSize = windows_size;
+			this.LineLength = line_length;
+			this.ContribRow = new ContributionType[line_length];
+			for (int u = 0 ; u < line_length ; u++) {
+				this.ContribRow[u] = new ContributionType(windows_size);
+			}
+		}
+	}
 
 /* Each core filter has its own radius */
-	#define DEFAULT_FILTER_BICUBIC				3.0
-			#define DEFAULT_FILTER_BOX					0.5
-			#define DEFAULT_FILTER_GENERALIZED_CUBIC	0.5
-			#define DEFAULT_FILTER_RADIUS				1.0
-			#define DEFAULT_LANCZOS8_RADIUS				8.0
-			#define DEFAULT_LANCZOS3_RADIUS				3.0
-			#define DEFAULT_HERMITE_RADIUS				1.0
-			#define DEFAULT_BOX_RADIUS					0.5
-			#define DEFAULT_TRIANGLE_RADIUS				1.0
-			#define DEFAULT_BELL_RADIUS					1.5
-			#define DEFAULT_CUBICSPLINE_RADIUS			2.0
-			#define DEFAULT_MITCHELL_RADIUS				2.0
-			#define DEFAULT_COSINE_RADIUS				1.0
-			#define DEFAULT_CATMULLROM_RADIUS			2.0
-			#define DEFAULT_QUADRATIC_RADIUS			1.5
-			#define DEFAULT_QUADRATICBSPLINE_RADIUS		1.5
-			#define DEFAULT_CUBICCONVOLUTION_RADIUS		3.0
-			#define DEFAULT_GAUSSIAN_RADIUS				1.0
-			#define DEFAULT_HANNING_RADIUS				1.0
-			#define DEFAULT_HAMMING_RADIUS				1.0
-			#define DEFAULT_SINC_RADIUS					1.0
-			#define DEFAULT_WELSH_RADIUS				1.0
+	private static final double DEFAULT_FILTER_BICUBIC				= 3.0;
+	private static final double DEFAULT_FILTER_BOX					= 0.5;
+	private static final double DEFAULT_FILTER_GENERALIZED_CUBIC	= 0.5;
+	private static final double DEFAULT_FILTER_RADIUS				= 1.0;
+	private static final double DEFAULT_LANCZOS8_RADIUS				= 8.0;
+	private static final double DEFAULT_LANCZOS3_RADIUS				= 3.0;
+	private static final double DEFAULT_HERMITE_RADIUS				= 1.0;
+	private static final double DEFAULT_BOX_RADIUS					= 0.5;
+	private static final double DEFAULT_TRIANGLE_RADIUS				= 1.0;
+	private static final double DEFAULT_BELL_RADIUS					= 1.5;
+	private static final double DEFAULT_CUBICSPLINE_RADIUS			= 2.0;
+	private static final double DEFAULT_MITCHELL_RADIUS				= 2.0;
+	private static final double DEFAULT_COSINE_RADIUS				= 1.0;
+	private static final double DEFAULT_CATMULLROM_RADIUS			= 2.0;
+	private static final double DEFAULT_QUADRATIC_RADIUS			= 1.5;
+	private static final double DEFAULT_QUADRATICBSPLINE_RADIUS		= 1.5;
+	private static final double DEFAULT_CUBICCONVOLUTION_RADIUS		= 3.0;
+	private static final double DEFAULT_GAUSSIAN_RADIUS				= 1.0;
+	private static final double DEFAULT_HANNING_RADIUS				= 1.0;
+	private static final double DEFAULT_HAMMING_RADIUS				= 1.0;
+	private static final double DEFAULT_SINC_RADIUS					= 1.0;
+	private static final double DEFAULT_WELSH_RADIUS				= 1.0;
 
-	static double KernelBessel_J1(const double x)
-	{
+	private static double KernelBessel_J1(final double x) {
 		double p, q;
 
-		register long i;
-
-		static const double
+		final double
 			Pone[] =
 			{
 					0.581199354001606143928050809e+21,
@@ -3163,7 +3198,7 @@ TODO:
 
 		p = Pone[8];
 		q = Qone[8];
-		for (i=7; i >= 0; i--)
+		for (int i=7; i >= 0; i--)
 		{
 			p = p*x*x+Pone[i];
 			q = q*x*x+Qone[i];
@@ -3171,13 +3206,11 @@ TODO:
 		return (double)(p/q);
 	}
 
-	static double KernelBessel_P1(const double x)
+	private static double KernelBessel_P1(final double x)
 	{
 		double p, q;
 
-		register long i;
-
-		static const double
+		final double
 			Pone[] =
 			{
 					0.352246649133679798341724373e+5,
@@ -3199,7 +3232,7 @@ TODO:
 
 		p = Pone[5];
 		q = Qone[5];
-		for (i=4; i >= 0; i--)
+		for (int i=4; i >= 0; i--)
 		{
 			p = p*(8.0/x)*(8.0/x)+Pone[i];
 			q = q*(8.0/x)*(8.0/x)+Qone[i];
@@ -3207,13 +3240,11 @@ TODO:
 		return (double)(p/q);
 	}
 
-	static double KernelBessel_Q1(const double x)
+	private static double KernelBessel_Q1(final double x)
 	{
 		double p, q;
 
-		register long i;
-
-		static const double
+		final double
 			Pone[] =
 			{
 					0.3511751914303552822533318e+3,
@@ -3235,7 +3266,7 @@ TODO:
 
 		p = Pone[5];
 		q = Qone[5];
-		for (i=4; i >= 0; i--)
+		for (int i=4; i >= 0; i--)
 		{
 			p = p*(8.0/x)*(8.0/x)+Pone[i];
 			q = q*(8.0/x)*(8.0/x)+Qone[i];
@@ -3243,7 +3274,7 @@ TODO:
 		return (double)(p/q);
 	}
 
-	static double KernelBessel_Order1(double x)
+	private static double KernelBessel_Order1(double x)
 	{
 		double p, q;
 
@@ -3254,24 +3285,24 @@ TODO:
 			x=(-x);
 		if (x < 8.0)
 			return (p*KernelBessel_J1(x));
-		q = (double)sqrt(2.0f/(M_PI*x))*(double)(KernelBessel_P1(x)*(1.0f/sqrt(2.0f)*(sin(x)-cos(x)))-8.0f/x*KernelBessel_Q1(x)*
+		q = (double)sqrt(2.0f/(PI*x))*(double)(KernelBessel_P1(x)*(1.0f/sqrt(2.0f)*(sin(x)-cos(x)))-8.0f/x*KernelBessel_Q1(x)*
 				(-1.0f/sqrt(2.0f)*(sin(x)+cos(x))));
 		if (p < 0.0f)
 			q = (-q);
 		return (q);
 	}
 
-	static double filter_bessel(const double x)
+	private static double filter_bessel(final double x)
 	{
 		if (x == 0.0f)
-			return (double)(M_PI/4.0f);
-		return (KernelBessel_Order1((double)M_PI*x)/(2.0f*x));
+			return (double)(PI/4.0f);
+		return (KernelBessel_Order1((double)PI*x)/(2.0f*x));
 	}
 
 
-	static double filter_blackman(const double x)
+	private static double filter_blackman(final double x)
 	{
-		return (0.42f+0.5f*(double)cos(M_PI*x)+0.08f*(double)cos(2.0f*M_PI*x));
+		return (0.42f+0.5f*(double)cos(PI*x)+0.08f*(double)cos(2.0f*PI*x));
 	}
 
 	/**
@@ -3285,10 +3316,10 @@ TODO:
 	 \endverbatim
 	 * ***bd*** 2.2004
 	 */
-	static double filter_bicubic(const double t)
+	private static double filter_bicubic(final double t)
 	{
-		const double abs_t = (double)fabs(t);
-		const double abs_t_sq = abs_t * abs_t;
+		final double abs_t = (double)abs(t);
+		final double abs_t_sq = abs_t * abs_t;
 		if (abs_t<1) return 1-2*abs_t_sq+abs_t_sq*abs_t;
 		if (abs_t<2) return 4 - 8*abs_t +5*abs_t_sq - abs_t_sq*abs_t;
 		return 0;
@@ -3305,24 +3336,23 @@ TODO:
 	 \endverbatim
 	 * Often used values for a are -1 and -1/2.
 	 */
-	static double filter_generalized_cubic(const double t)
+	private static double filter_generalized_cubic(final double t)
 	{
-		const double a = -DEFAULT_FILTER_GENERALIZED_CUBIC;
-		double abs_t = (double)fabs(t);
+		final double a = -DEFAULT_FILTER_GENERALIZED_CUBIC;
+		double abs_t = (double)abs(t);
 		double abs_t_sq = abs_t * abs_t;
 		if (abs_t < 1) return (a + 2) * abs_t_sq * abs_t - (a + 3) * abs_t_sq + 1;
 		if (abs_t < 2) return a * abs_t_sq * abs_t - 5 * a * abs_t_sq + 8 * a * abs_t - 4 * a;
 		return 0;
 	}
 
-	#ifdef FUNCTION_NOT_USED_YET
 	/* CubicSpline filter, default radius 2 */
-	static double filter_cubic_spline(const double x1)
+	private static double filter_cubic_spline(final double x1)
 	{
-		const double x = x1 < 0.0 ? -x1 : x1;
+		final double x = x1 < 0.0 ? -x1 : x1;
 
 		if (x < 1.0 ) {
-			const double x2 = x*x;
+			final double x2 = x*x;
 
 			return (0.5 * x2 * x - x2 + 2.0 / 3.0);
 		}
@@ -3331,24 +3361,21 @@ TODO:
 		}
 		return 0;
 	}
-	#endif
 
-	#ifdef FUNCTION_NOT_USED_YET
 	/* CubicConvolution filter, default radius 3 */
-	static double filter_cubic_convolution(const double x1)
+	private static double filter_cubic_convolution(final double x1)
 	{
-		const double x = x1 < 0.0 ? -x1 : x1;
-		const double x2 = x1 * x1;
-		const double x2_x = x2 * x;
+		final double x = x1 < 0.0 ? -x1 : x1;
+		final double x2 = x1 * x1;
+		final double x2_x = x2 * x;
 
 		if (x <= 1.0) return ((4.0 / 3.0)* x2_x - (7.0 / 3.0) * x2 + 1.0);
 		if (x <= 2.0) return (- (7.0 / 12.0) * x2_x + 3 * x2 - (59.0 / 12.0) * x + 2.5);
 		if (x <= 3.0) return ( (1.0/12.0) * x2_x - (2.0 / 3.0) * x2 + 1.75 * x - 1.5);
 		return 0;
 	}
-	#endif
 
-	static double filter_box(double x) {
+	private static double filter_box(double x) {
 		if (x < - DEFAULT_FILTER_BOX)
 			return 0.0f;
 		if (x < DEFAULT_FILTER_BOX)
@@ -3356,7 +3383,7 @@ TODO:
 		return 0.0f;
 	}
 
-	static double filter_catmullrom(const double x)
+	private static double filter_catmullrom(final double x)
 	{
 		if (x < -2.0)
 			return(0.0f);
@@ -3371,55 +3398,47 @@ TODO:
 		return(0.0f);
 	}
 
-	#ifdef FUNCTION_NOT_USED_YET
-	static double filter_filter(double t)
+	private static double filter_filter(double t)
 	{
 	/* f(t) = 2|t|^3 - 3|t|^2 + 1, -1 <= t <= 1 */
 		if(t < 0.0) t = -t;
 		if(t < 1.0) return((2.0 * t - 3.0) * t * t + 1.0);
 		return(0.0);
 	}
-	#endif
 
-	#ifdef FUNCTION_NOT_USED_YET
 	/* Lanczos8 filter, default radius 8 */
-	static double filter_lanczos8(const double x1)
+	private static double filter_lanczos8(final double x1)
 	{
-		const double x = x1 < 0.0 ? -x1 : x1;
-		#define R DEFAULT_LANCZOS8_RADIUS
+		final double x = x1 < 0.0 ? -x1 : x1;
+		final double R = DEFAULT_LANCZOS8_RADIUS;
 
 		if ( x == 0.0) return 1;
 
 		if ( x < R) {
-			return R * sin(x*M_PI) * sin(x * M_PI/ R) / (x * M_PI * x * M_PI);
+			return R * sin(x*PI) * sin(x * PI/ R) / (x * PI * x * PI);
 		}
 		return 0.0;
-		#undef R
 	}
-	#endif
 
-	#ifdef FUNCTION_NOT_USED_YET
 	/* Lanczos3 filter, default radius 3 */
-	static double filter_lanczos3(const double x1)
+	private static double filter_lanczos3(final double x1)
 	{
-		const double x = x1 < 0.0 ? -x1 : x1;
-		#define R DEFAULT_LANCZOS3_RADIUS
+		final double x = x1 < 0.0 ? -x1 : x1;
+		final double R = DEFAULT_LANCZOS3_RADIUS;
 
 		if ( x == 0.0) return 1;
 
 		if ( x < R)
 		{
-			return R * sin(x*M_PI) * sin(x * M_PI / R) / (x * M_PI * x * M_PI);
+			return R * sin(x*PI) * sin(x * PI / R) / (x * PI * x * PI);
 		}
 		return 0.0;
-		#undef R
 	}
-	#endif
 
 	/* Hermite filter, default radius 1 */
-	static double filter_hermite(const double x1)
+	private static double filter_hermite(final double x1)
 	{
-		const double x = x1 < 0.0 ? -x1 : x1;
+		final double x = x1 < 0.0 ? -x1 : x1;
 
 		if (x < 1.0) return ((2.0 * x - 3) * x * x + 1.0 );
 
@@ -3427,17 +3446,17 @@ TODO:
 	}
 
 	/* Trangle filter, default radius 1 */
-	static double filter_triangle(const double x1)
+	private static double filter_triangle(final double x1)
 	{
-		const double x = x1 < 0.0 ? -x1 : x1;
+		final double x = x1 < 0.0 ? -x1 : x1;
 		if (x < 1.0) return (1.0 - x);
 		return 0.0;
 	}
 
 	/* Bell filter, default radius 1.5 */
-	static double filter_bell(const double x1)
+	private static double filter_bell(final double x1)
 	{
-		const double x = x1 < 0.0 ? -x1 : x1;
+		final double x = x1 < 0.0 ? -x1 : x1;
 
 		if (x < 0.5) return (0.75 - x*x);
 		if (x < 1.5) return (0.5 * pow(x - 1.5, 2.0));
@@ -3445,17 +3464,17 @@ TODO:
 	}
 
 	/* Mitchell filter, default radius 2.0 */
-	static double filter_mitchell(const double x)
+	private static double filter_mitchell(final double x)
 	{
-		#define KM_B (1.0f/3.0f)
-		#define KM_C (1.0f/3.0f)
-		#define KM_P0 ((  6.0f - 2.0f * KM_B ) / 6.0f)
-		#define KM_P2 ((-18.0f + 12.0f * KM_B + 6.0f * KM_C) / 6.0f)
-		#define KM_P3 (( 12.0f - 9.0f  * KM_B - 6.0f * KM_C) / 6.0f)
-		#define KM_Q0 ((  8.0f * KM_B + 24.0f * KM_C) / 6.0f)
-		#define KM_Q1 ((-12.0f * KM_B - 48.0f * KM_C) / 6.0f)
-		#define KM_Q2 ((  6.0f * KM_B + 30.0f * KM_C) / 6.0f)
-		#define KM_Q3 (( -1.0f * KM_B -  6.0f * KM_C) / 6.0f)
+		final double KM_B = (1.0f/3.0f);
+		final double KM_C = (1.0f/3.0f);
+		final double KM_P0 = ((  6.0f - 2.0f * KM_B ) / 6.0f);
+		final double KM_P2 = ((-18.0f + 12.0f * KM_B + 6.0f * KM_C) / 6.0f);
+		final double KM_P3 = (( 12.0f - 9.0f  * KM_B - 6.0f * KM_C) / 6.0f);
+		final double KM_Q0 = ((  8.0f * KM_B + 24.0f * KM_C) / 6.0f);
+		final double KM_Q1 = ((-12.0f * KM_B - 48.0f * KM_C) / 6.0f);
+		final double KM_Q2 = ((  6.0f * KM_B + 30.0f * KM_C) / 6.0f);
+		final double KM_Q3 = (( -1.0f * KM_B -  6.0f * KM_C) / 6.0f);
 
 		if (x < -2.0)
 			return(0.0f);
@@ -3472,36 +3491,34 @@ TODO:
 
 
 
-	#ifdef FUNCTION_NOT_USED_YET
 	/* Cosine filter, default radius 1 */
-	static double filter_cosine(const double x)
+	private static double filter_cosine(final double x)
 	{
-		if ((x >= -1.0) && (x <= 1.0)) return ((cos(x * M_PI) + 1.0)/2.0);
+		if ((x >= -1.0) && (x <= 1.0)) return ((cos(x * PI) + 1.0)/2.0);
 
 		return 0;
 	}
-	#endif
 
 	/* Quadratic filter, default radius 1.5 */
-	static double filter_quadratic(const double x1)
+	private static double filter_quadratic(final double x1)
 	{
-		const double x = x1 < 0.0 ? -x1 : x1;
+		final double x = x1 < 0.0 ? -x1 : x1;
 
 		if (x <= 0.5) return (- 2.0 * x * x + 1);
 		if (x <= 1.5) return (x * x - 2.5* x + 1.5);
 		return 0.0;
 	}
 
-	static double filter_bspline(const double x)
+	private static double filter_bspline(final double x)
 	{
 		if (x>2.0f) {
 			return 0.0f;
 		} else {
 			double a, b, c, d;
 		/* Was calculated anyway cause the "if((x-1.0f) < 0)" */
-			const double xm1 = x - 1.0f;
-			const double xp1 = x + 1.0f;
-			const double xp2 = x + 2.0f;
+			final double xm1 = x - 1.0f;
+			final double xp1 = x + 1.0f;
+			final double xp2 = x + 2.0f;
 
 			if ((xp2) <= 0.0f) a = 0.0f; else a = xp2*xp2*xp2;
 			if ((xp1) <= 0.0f) b = 0.0f; else b = xp1*xp1*xp1;
@@ -3512,34 +3529,32 @@ TODO:
 		}
 	}
 
-	#ifdef FUNCTION_NOT_USED_YET
 	/* QuadraticBSpline filter, default radius 1.5 */
-	static double filter_quadratic_bspline(const double x1)
+	private static double filter_quadratic_bspline(final double x1)
 	{
-		const double x = x1 < 0.0 ? -x1 : x1;
+		final double x = x1 < 0.0 ? -x1 : x1;
 
 		if (x <= 0.5) return (- x * x + 0.75);
 		if (x <= 1.5) return (0.5 * x * x - 1.5 * x + 1.125);
 		return 0.0;
 	}
-	#endif
 
-	static double filter_gaussian(const double x)
+	private static double filter_gaussian(final double x)
 	{
-	/* return(exp((double) (-2.0 * x * x)) * sqrt(2.0 / M_PI)); */
+	/* return(exp((double) (-2.0 * x * x)) * sqrt(2.0 / PI)); */
 		return (double)(exp(-2.0f * x * x) * 0.79788456080287f);
 	}
 
-	static double filter_hanning(const double x)
+	private static double filter_hanning(final double x)
 	{
 	/* A Cosine windowing function */
-		return(0.5 + 0.5 * cos(M_PI * x));
+		return(0.5 + 0.5 * cos(PI * x));
 	}
 
-	static double filter_hamming(const double x)
+	private static double filter_hamming(final double x)
 	{
 	/* should be
-	(0.54+0.46*cos(M_PI*(double) x));
+	(0.54+0.46*cos(PI*(double) x));
 	but this approximation is sufficient */
 		if (x < -1.0f)
 			return 0.0f;
@@ -3550,99 +3565,91 @@ TODO:
 		return 0.0f;
 	}
 
-	static double filter_power(const double x)
+	private static double filter_power(final double x)
 	{
-		const double a = 2.0f;
-		if (fabs(x)>1) return 0.0f;
-		return (1.0f - (double)fabs(pow(x,a)));
+		final double a = 2.0f;
+		if (abs(x)>1) return 0.0f;
+		return (1.0f - (double)abs(pow(x, a)));
 	}
 
-	static double filter_sinc(const double x)
+	private static double filter_sinc(final double x)
 	{
 	/* X-scaled Sinc(x) function. */
 		if (x == 0.0) return(1.0);
-		return (sin(M_PI * (double) x) / (M_PI * (double) x));
+		return (sin(PI * (double) x) / (PI * (double) x));
 	}
 
-	#ifdef FUNCTION_NOT_USED_YET
-	static double filter_welsh(const double x)
+	private static double filter_welsh(final double x)
 	{
 	/* Welsh parabolic windowing filter */
 		if (x <  1.0)
 			return(1 - x*x);
 		return(0.0);
 	}
-	#endif
-
-	#if defined(_MSC_VER) && !defined(inline)
-	# define inline __inline
-	#endif
 
 /* Copied from upstream's libgd */
-	static inline int _color_blend (const int dst, const int src)
+	private static int _color_blend (final int dst, final int src)
 	{
-		const int src_alpha = gdTrueColorGetAlpha(src);
+		final int src_alpha = GdUtils.trueColorGetAlpha(src);
 
-		if( src_alpha == gdAlphaOpaque ) {
+		if( src_alpha == GdUtils.ALPHA_OPAQUE ) {
 			return src;
 		} else {
-			const int dst_alpha = gdTrueColorGetAlpha(dst);
+			final int dst_alpha = GdUtils.trueColorGetAlpha(dst);
 
-			if( src_alpha == gdAlphaTransparent ) return dst;
-			if( dst_alpha == gdAlphaTransparent ) {
+			if( src_alpha == GdUtils.ALPHA_TRANSPARENT ) return dst;
+			if( dst_alpha == GdUtils.ALPHA_TRANSPARENT ) {
 				return src;
 			} else {
-				register int alpha, red, green, blue;
-				const int src_weight = gdAlphaTransparent - src_alpha;
-				const int dst_weight = (gdAlphaTransparent - dst_alpha) * src_alpha / gdAlphaMax;
-				const int tot_weight = src_weight + dst_weight;
+				int alpha, red, green, blue;
+				final int src_weight = GdUtils.ALPHA_TRANSPARENT - src_alpha;
+				final int dst_weight = (GdUtils.ALPHA_TRANSPARENT - dst_alpha) * src_alpha / GdUtils.ALPHA_MAX;
+				final int tot_weight = src_weight + dst_weight;
 
-				alpha = src_alpha * dst_alpha / gdAlphaMax;
+				alpha = src_alpha * dst_alpha / GdUtils.ALPHA_MAX;
 
-				red = (gdTrueColorGetRed(src) * src_weight
-						+ gdTrueColorGetRed(dst) * dst_weight) / tot_weight;
-				green = (gdTrueColorGetGreen(src) * src_weight
-						+ gdTrueColorGetGreen(dst) * dst_weight) / tot_weight;
-				blue = (gdTrueColorGetBlue(src) * src_weight
-						+ gdTrueColorGetBlue(dst) * dst_weight) / tot_weight;
+				red = (GdUtils.trueColorGetRed(src) * src_weight
+						+ GdUtils.trueColorGetRed(dst) * dst_weight) / tot_weight;
+				green = (GdUtils.trueColorGetGreen(src) * src_weight
+						+ GdUtils.trueColorGetGreen(dst) * dst_weight) / tot_weight;
+				blue = (GdUtils.trueColorGetBlue(src) * src_weight
+						+ GdUtils.trueColorGetBlue(dst) * dst_weight) / tot_weight;
 
 				return ((alpha << 24) + (red << 16) + (green << 8) + blue);
 			}
 		}
 	}
 
-	static inline int _setEdgePixel(const gdImagePtr src, unsigned int x, unsigned int y, gdFixed coverage, const int bgColor)
-	{
-		const gdFixed f_127 = gd_itofx(127);
-		register int c = src->tpixels[y][x];
+	private int _setEdgePixel(final int x, final int y, final long coverage, final int bgColor) {
+		final long f_127 = gd_itofx(127);
+		int c = this.tpixels[y][x];
 		c = c | (( (int) (gd_fxtof(gd_mulfx(coverage, f_127)) + 50.5f)) << 24);
 		return _color_blend(bgColor, c);
 	}
 
-	static inline int getPixelOverflowTC(gdImagePtr im, const int x, const int y, const int bgColor)
-	{
-		if (gdImageBoundsSafe(im, x, y)) {
-			const int c = im->tpixels[y][x];
-			if (c == im->transparent) {
-				return bgColor == -1 ? gdTrueColorAlpha(0, 0, 0, 127) : bgColor;
+	private int getPixelOverflowTC(final int x, final int y, final int bgColor) {
+		if (isBoundsSafe(x, y)) {
+			final int c = this.tpixels[y][x];
+			if (c == this.transparent) {
+				return bgColor == -1 ? GdUtils.trueColorMixAlpha(0, 0, 0, 127) : bgColor;
 			}
 			return c;
 		} else {
-			register int border = 0;
+			int border = 0;
 
-			if (y < im->cy1) {
-				border = im->tpixels[0][im->cx1];
+			if (y < this.cy1) {
+				border = this.tpixels[0][this.cx1];
 				goto processborder;
 			}
 
-			if (y < im->cy1) {
-				border = im->tpixels[0][im->cx1];
+			if (y < this.cy1) {
+				border = this.tpixels[0][this.cx1];
 				goto processborder;
 			}
 
-			if (y > im->cy2) {
-				if (x >= im->cx1 && x <= im->cx1) {
-					border = im->tpixels[im->cy2][x];
+			if (y > this.cy2) {
+				if (x >= this.cx1 && x <= this.cx1) {
+					border = this.tpixels[this.cy2][x];
 					goto processborder;
 				} else {
 					return gdTrueColorAlpha(0, 0, 0, 127);
@@ -3650,116 +3657,122 @@ TODO:
 			}
 
 		/* y is bound safe at this point */
-			if (x < im->cx1) {
-				border = im->tpixels[y][im->cx1];
+			if (x < this.cx1) {
+				border = this.tpixels[y][this.cx1];
 				goto processborder;
 			}
 
-			if (x > im->cx2) {
-				border = im->tpixels[y][im->cx2];
+			if (x > this.cx2) {
+				border = this.tpixels[y][this.cx2];
 			}
 
 			processborder:
-			if (border == im->transparent) {
-				return gdTrueColorAlpha(0, 0, 0, 127);
+			if (border == this.transparent) {
+				return GdUtils.trueColorMixAlpha(0, 0, 0, 127);
 			} else{
-				return gdTrueColorAlpha(gdTrueColorGetRed(border), gdTrueColorGetGreen(border), gdTrueColorGetBlue(border), 127);
+				return GdUtils.trueColorMixAlpha(GdUtils.trueColorGetRed(border), GdUtils.trueColorGetGreen(border), GdUtils.trueColorGetBlue(border), 127);
 			}
 		}
 	}
 
-	#define colorIndex2RGBA(c) gdTrueColorAlpha(im->red[(c)], im->green[(c)], im->blue[(c)], im->alpha[(c)])
-			#define colorIndex2RGBcustomA(c, a) gdTrueColorAlpha(im->red[(c)], im->green[(c)], im->blue[(c)], im->alpha[(a)])
-	static inline int getPixelOverflowPalette(gdImagePtr im, const int x, const int y, const int bgColor)
+	private int colorIndex2RGBA(final int c) {
+		return GdUtils.trueColorMixAlpha(this.red[(c)], this.green[(c)], this.blue[(c)], this.alpha[(c)]);
+	}
+
+	private int colorIndex2RGBcustomA(final int c, final int a) {
+		return GdUtils.trueColorMixAlpha(this.red[(c)], this.green[(c)], this.blue[(c)], this.alpha[(a)]);
+	}
+
+	private int getPixelOverflowPalette(final int x, final int y, final int bgColor)
 	{
-		if (gdImageBoundsSafe(im, x, y)) {
-			const int c = im->pixels[y][x];
-			if (c == im->transparent) {
-				return bgColor == -1 ? gdTrueColorAlpha(0, 0, 0, 127) : bgColor;
+		if (isBoundsSafe(x, y)) {
+			final int c = this.pixels[y][x];
+			if (c == this.transparent) {
+				return bgColor == -1 ? GdUtils.trueColorMixAlpha(0, 0, 0, 127) : bgColor;
 			}
 			return colorIndex2RGBA(c);
 		} else {
-			register int border = 0;
-			if (y < im->cy1) {
-				border = gdImageGetPixel(im, im->cx1, 0);
+			int border = 0;
+			if (y < this.cy1) {
+				border = getPixel(this.cx1, 0);
 				goto processborder;
 			}
 
-			if (y < im->cy1) {
-				border = gdImageGetPixel(im, im->cx1, 0);
+			if (y < this.cy1) {
+				border = getPixel(this.cx1, 0);
 				goto processborder;
 			}
 
-			if (y > im->cy2) {
-				if (x >= im->cx1 && x <= im->cx1) {
-					border = gdImageGetPixel(im, x,  im->cy2);
+			if (y > this.cy2) {
+				if (x >= this.cx1 && x <= this.cx1) {
+					border = getPixel(x, this.cy2);
 					goto processborder;
 				} else {
-					return gdTrueColorAlpha(0, 0, 0, 127);
+					return GdUtils.trueColorMixAlpha(0, 0, 0, 127);
 				}
 			}
 
 		/* y is bound safe at this point */
-			if (x < im->cx1) {
-				border = gdImageGetPixel(im, im->cx1, y);
+			if (x < this.cx1) {
+				border = getPixel(this.cx1, y);
 				goto processborder;
 			}
 
-			if (x > im->cx2) {
-				border = gdImageGetPixel(im, im->cx2, y);
+			if (x > this.cx2) {
+				border = getPixel(this.cx2, y);
 			}
 
 			processborder:
-			if (border == im->transparent) {
-				return gdTrueColorAlpha(0, 0, 0, 127);
+			if (border == this.transparent) {
+				return GdUtils.trueColorMixAlpha(0, 0, 0, 127);
 			} else{
 				return colorIndex2RGBcustomA(border, 127);
 			}
 		}
 	}
 
-	static int getPixelInterpolateWeight(gdImagePtr im, const double x, const double y, const int bgColor)
+	private int getPixelInterpolateWeight(final double x, final double y, final int bgColor)
 	{
 	/* Closest pixel <= (xf,yf) */
 		int sx = (int)(x);
 		int sy = (int)(y);
-		const double xf = x - (double)sx;
-		const double yf = y - (double)sy;
-		const double nxf = (double) 1.0 - xf;
-		const double nyf = (double) 1.0 - yf;
-		const double m1 = xf * yf;
-		const double m2 = nxf * yf;
-		const double m3 = xf * nyf;
-		const double m4 = nxf * nyf;
+		final double xf = x - (double)sx;
+		final double yf = y - (double)sy;
+		final double nxf = (double) 1.0 - xf;
+		final double nyf = (double) 1.0 - yf;
+		final double m1 = xf * yf;
+		final double m2 = nxf * yf;
+		final double m3 = xf * nyf;
+		final double m4 = nxf * nyf;
 
 	/* get color values of neighbouring pixels */
-		const int c1 = im->trueColor == 1 ? getPixelOverflowTC(im, sx, sy, bgColor)         : getPixelOverflowPalette(im, sx, sy, bgColor);
-		const int c2 = im->trueColor == 1 ? getPixelOverflowTC(im, sx - 1, sy, bgColor)     : getPixelOverflowPalette(im, sx - 1, sy, bgColor);
-		const int c3 = im->trueColor == 1 ? getPixelOverflowTC(im, sx, sy - 1, bgColor)     : getPixelOverflowPalette(im, sx, sy - 1, bgColor);
-		const int c4 = im->trueColor == 1 ? getPixelOverflowTC(im, sx - 1, sy - 1, bgColor) : getPixelOverflowPalette(im, sx, sy - 1, bgColor);
+		final int c1 = this.trueColor ? getPixelOverflowTC(sx, sy, bgColor)         : getPixelOverflowPalette(sx, sy, bgColor);
+		final int c2 = this.trueColor ? getPixelOverflowTC(sx - 1, sy, bgColor)     : getPixelOverflowPalette(sx - 1, sy, bgColor);
+		final int c3 = this.trueColor ? getPixelOverflowTC(sx, sy - 1, bgColor)     : getPixelOverflowPalette(sx, sy - 1, bgColor);
+		final int c4 = this.trueColor ? getPixelOverflowTC(sx - 1, sy - 1, bgColor) : getPixelOverflowPalette(sx, sy - 1, bgColor);
 		int r, g, b, a;
 
 		if (x < 0) sx--;
 		if (y < 0) sy--;
 
 	/* component-wise summing-up of color values */
-		if (im->trueColor) {
-			r = (int)(m1*gdTrueColorGetRed(c1)   + m2*gdTrueColorGetRed(c2)   + m3*gdTrueColorGetRed(c3)   + m4*gdTrueColorGetRed(c4));
-			g = (int)(m1*gdTrueColorGetGreen(c1) + m2*gdTrueColorGetGreen(c2) + m3*gdTrueColorGetGreen(c3) + m4*gdTrueColorGetGreen(c4));
-			b = (int)(m1*gdTrueColorGetBlue(c1)  + m2*gdTrueColorGetBlue(c2)  + m3*gdTrueColorGetBlue(c3)  + m4*gdTrueColorGetBlue(c4));
-			a = (int)(m1*gdTrueColorGetAlpha(c1) + m2*gdTrueColorGetAlpha(c2) + m3*gdTrueColorGetAlpha(c3) + m4*gdTrueColorGetAlpha(c4));
+		if (this.trueColor) {
+			r = (int)(m1*GdUtils.trueColorGetRed(c1)   + m2*GdUtils.trueColorGetRed(c2)   + m3*GdUtils.trueColorGetRed(c3)   + m4*GdUtils.trueColorGetRed(c4));
+			g = (int)(m1*GdUtils.trueColorGetGreen(c1) + m2*GdUtils.trueColorGetGreen(c2) + m3*GdUtils.trueColorGetGreen(c3) + m4*GdUtils.trueColorGetGreen(c4));
+			b = (int)(m1*GdUtils.trueColorGetBlue(c1)  + m2*GdUtils.trueColorGetBlue(c2)  + m3*GdUtils.trueColorGetBlue(c3)  + m4*GdUtils.trueColorGetBlue(c4));
+			a = (int)(m1*GdUtils.trueColorGetAlpha(c1) + m2*GdUtils.trueColorGetAlpha(c2) + m3*GdUtils.trueColorGetAlpha(c3) + m4*GdUtils.trueColorGetAlpha(c4));
 		} else {
-			r = (int)(m1*im->red[(c1)]   + m2*im->red[(c2)]   + m3*im->red[(c3)]   + m4*im->red[(c4)]);
-			g = (int)(m1*im->green[(c1)] + m2*im->green[(c2)] + m3*im->green[(c3)] + m4*im->green[(c4)]);
-			b = (int)(m1*im->blue[(c1)]  + m2*im->blue[(c2)]  + m3*im->blue[(c3)]  + m4*im->blue[(c4)]);
-			a = (int)(m1*im->alpha[(c1)] + m2*im->alpha[(c2)] + m3*im->alpha[(c3)] + m4*im->alpha[(c4)]);
+			r = (int)(m1*this.red[(c1)]   + m2*this.red[(c2)]   + m3*this.red[(c3)]   + m4*this.red[(c4)]);
+			g = (int)(m1*this.green[(c1)] + m2*this.green[(c2)] + m3*this.green[(c3)] + m4*this.green[(c4)]);
+			b = (int)(m1*this.blue[(c1)]  + m2*this.blue[(c2)]  + m3*this.blue[(c3)]  + m4*this.blue[(c4)]);
+			a = (int)(m1*this.alpha[(c1)] + m2*this.alpha[(c2)] + m3*this.alpha[(c3)] + m4*this.alpha[(c4)]);
 		}
 
 		r = CLAMP(r, 0, 255);
 		g = CLAMP(g, 0, 255);
 		b = CLAMP(b, 0, 255);
-		a = CLAMP(a, 0, gdAlphaMax);
-		return gdTrueColorAlpha(r, g, b, a);
+		a = CLAMP(a, 0, GdUtils.ALPHA_MAX);
+		return GdUtils.trueColorMixAlpha(r, g, b, a);
 	}
 
 	/**
@@ -3779,36 +3792,37 @@ TODO:
 	 * See also:
 	 *  <gdSetInterpolationMethod>
 	 */
-	int getPixelInterpolated(gdImagePtr im, const double x, const double y, const int bgColor)
+	int getPixelInterpolated(final double x, final double y, final int bgColor)
 	{
-		const int xi=(int)((x) < 0 ? x - 1: x);
-		const int yi=(int)((y) < 0 ? y - 1: y);
+		final int xi=(int)((x) < 0 ? x - 1: x);
+		final int yi=(int)((y) < 0 ? y - 1: y);
 		int yii;
 		int i;
 		double kernel, kernel_cache_y;
-		double kernel_x[12], kernel_y[4];
+		double[] kernel_x = new double[12];
+		double[] kernel_y = new double[4];
 		double new_r = 0.0f, new_g = 0.0f, new_b = 0.0f, new_a = 0.0f;
 
 	/* These methods use special implementations */
-		if (im->interpolation_id == GD_BILINEAR_FIXED || im->interpolation_id == GD_BICUBIC_FIXED || im->interpolation_id == GD_NEAREST_NEIGHBOUR) {
+		if (this.interpolation_id == GdInterpolationMethod.GD_BILINEAR_FIXED || this.interpolation_id == GdInterpolationMethod.GD_BICUBIC_FIXED || this.interpolation_id == GdInterpolationMethod.GD_NEAREST_NEIGHBOUR) {
 			return -1;
 		}
 
-		if (im->interpolation_id == GD_WEIGHTED4) {
-			return getPixelInterpolateWeight(im, x, y, bgColor);
+		if (this.interpolation_id == GdInterpolationMethod.GD_WEIGHTED4) {
+			return getPixelInterpolateWeight(x, y, bgColor);
 		}
 
-		if (im->interpolation_id == GD_NEAREST_NEIGHBOUR) {
-			if (im->trueColor == 1) {
-				return getPixelOverflowTC(im, xi, yi, bgColor);
+		if (this.interpolation_id == GdInterpolationMethod.GD_NEAREST_NEIGHBOUR) {
+			if (this.trueColor) {
+				return getPixelOverflowTC(xi, yi, bgColor);
 			} else {
-				return getPixelOverflowPalette(im, xi, yi, bgColor);
+				return getPixelOverflowPalette(xi, yi, bgColor);
 			}
 		}
-		if (im->interpolation) {
+		if (this.interpolation != null) {
 			for (i=0; i<4; i++) {
-				kernel_x[i] = (double) im->interpolation((double)(xi+i-1-x));
-				kernel_y[i] = (double) im->interpolation((double)(yi+i-1-y));
+				kernel_x[i] = (double) this.interpolation.interpolate((double) (xi + i - 1 - x));
+				kernel_y[i] = (double) this.interpolation.interpolate((double)(yi+i-1-y));
 			}
 		} else {
 			return -1;
@@ -3821,74 +3835,44 @@ TODO:
 		for (yii = yi-1; yii < yi+3; yii++) {
 			int xii;
 			kernel_cache_y = kernel_y[yii-(yi-1)];
-			if (im->trueColor) {
+			if (this.trueColor) {
 				for (xii=xi-1; xii<xi+3; xii++) {
-					const int rgbs = getPixelOverflowTC(im, xii, yii, bgColor);
+					final int rgbs = getPixelOverflowTC(xii, yii, bgColor);
 
 					kernel = kernel_cache_y * kernel_x[xii-(xi-1)];
-					new_r += kernel * gdTrueColorGetRed(rgbs);
-					new_g += kernel * gdTrueColorGetGreen(rgbs);
-					new_b += kernel * gdTrueColorGetBlue(rgbs);
-					new_a += kernel * gdTrueColorGetAlpha(rgbs);
+					new_r += kernel * GdUtils.trueColorGetRed(rgbs);
+					new_g += kernel * GdUtils.trueColorGetGreen(rgbs);
+					new_b += kernel * GdUtils.trueColorGetBlue(rgbs);
+					new_a += kernel * GdUtils.trueColorGetAlpha(rgbs);
 				}
 			} else {
 				for (xii=xi-1; xii<xi+3; xii++) {
-					const int rgbs = getPixelOverflowPalette(im, xii, yii, bgColor);
+					final int rgbs = getPixelOverflowPalette(xii, yii, bgColor);
 
 					kernel = kernel_cache_y * kernel_x[xii-(xi-1)];
-					new_r += kernel * gdTrueColorGetRed(rgbs);
-					new_g += kernel * gdTrueColorGetGreen(rgbs);
-					new_b += kernel * gdTrueColorGetBlue(rgbs);
-					new_a += kernel * gdTrueColorGetAlpha(rgbs);
+					new_r += kernel * GdUtils.trueColorGetRed(rgbs);
+					new_g += kernel * GdUtils.trueColorGetGreen(rgbs);
+					new_b += kernel * GdUtils.trueColorGetBlue(rgbs);
+					new_a += kernel * GdUtils.trueColorGetAlpha(rgbs);
 				}
 			}
 		}
 
-		new_r = CLAMP(new_r, 0, 255);
-		new_g = CLAMP(new_g, 0, 255);
-		new_b = CLAMP(new_b, 0, 255);
-		new_a = CLAMP(new_a, 0, gdAlphaMax);
+		new_r = CLAMP((int) new_r, 0, 255);
+		new_g = CLAMP((int) new_g, 0, 255);
+		new_b = CLAMP((int) new_b, 0, 255);
+		new_a = CLAMP((int) new_a, 0, GdUtils.ALPHA_MAX);
 
-		return gdTrueColorAlpha(((int)new_r), ((int)new_g), ((int)new_b), ((int)new_a));
+		return GdUtils.trueColorMixAlpha(((int) new_r), ((int) new_g), ((int) new_b), ((int) new_a));
 	}
 
-	static inline LineContribType * _gdContributionsAlloc(unsigned int line_length, unsigned int windows_size)
-	{
-		unsigned int u = 0;
-		LineContribType *res;
-
-		res = (LineContribType *) gdMalloc(sizeof(LineContribType));
-		if (!res) {
-			return NULL;
-		}
-		res->WindowSize = windows_size;
-		res->LineLength = line_length;
-		res->ContribRow = (ContributionType *) gdMalloc(line_length * sizeof(ContributionType));
-
-		for (u = 0 ; u < line_length ; u++) {
-			res->ContribRow[u].Weights = (double *) gdMalloc(windows_size * sizeof(double));
-		}
-		return res;
-	}
-
-	static inline void _gdContributionsFree(LineContribType * p)
-	{
-		unsigned int u;
-		for (u = 0; u < p->LineLength; u++)  {
-			gdFree(p->ContribRow[u].Weights);
-		}
-		gdFree(p->ContribRow);
-		gdFree(p);
-	}
-
-	static inline LineContribType *_gdContributionsCalc(unsigned int line_size, unsigned int src_size, double scale_d,  const interpolation_method pFilter)
+	private LineContribType _gdContributionsCalc(int line_size, int src_size, double scale_d,  final GdInterpolation pFilter)
 	{
 		double width_d;
 		double scale_f_d = 1.0;
-		const double filter_width_d = DEFAULT_BOX_RADIUS;
+		final double filter_width_d = DEFAULT_BOX_RADIUS;
 		int windows_size;
-		unsigned int u;
-		LineContribType *res;
+		int u;
 
 		if (scale_d < 1.0) {
 			width_d = filter_width_d / scale_d;
@@ -3898,12 +3882,12 @@ TODO:
 		}
 
 		windows_size = 2 * (int)ceil(width_d) + 1;
-		res = _gdContributionsAlloc(line_size, windows_size);
+		final LineContribType res = new LineContribType(line_size, windows_size);
 
 		for (u = 0; u < line_size; u++) {
-			const double dCenter = (double)u / scale_d;
+			final double dCenter = (double)u / scale_d;
 		/* get the significant edge points affecting the pixel */
-			register int iLeft = MAX(0, (int)floor (dCenter - width_d));
+			int iLeft = MAX(0, (int)floor (dCenter - width_d));
 			int iRight = MIN((int)ceil(dCenter + width_d), (int)src_size - 1);
 			double dTotalWeight = 0.0;
 			int iSrc;
@@ -3917,21 +3901,20 @@ TODO:
 				}
 			}
 
-			res->ContribRow[u].Left = iLeft;
-			res->ContribRow[u].Right = iRight;
+			res.ContribRow[u].Left = iLeft;
+			res.ContribRow[u].Right = iRight;
 
 			for (iSrc = iLeft; iSrc <= iRight; iSrc++) {
-				dTotalWeight += (res->ContribRow[u].Weights[iSrc-iLeft] =  scale_f_d * (*pFilter)(scale_f_d * (dCenter - (double)iSrc)));
+				dTotalWeight += (res.ContribRow[u].Weights[iSrc-iLeft] =  scale_f_d * (*pFilter)(scale_f_d * (dCenter - (double)iSrc)));
 			}
 
 			if (dTotalWeight < 0.0) {
-				_gdContributionsFree(res);
-				return NULL;
+				return null;
 			}
 
 			if (dTotalWeight > 0.0) {
 				for (iSrc = iLeft; iSrc <= iRight; iSrc++) {
-					res->ContribRow[u].Weights[iSrc-iLeft] /= dTotalWeight;
+					res.ContribRow[u].Weights[iSrc-iLeft] /= dTotalWeight;
 				}
 			}
 		}
@@ -3939,63 +3922,64 @@ TODO:
 	}
 
 
-	static inline void
-				  _gdScaleOneAxis(gdImagePtr pSrc, gdImagePtr dst,
-								  unsigned int dst_len, unsigned int row, LineContribType *contrib,
-								  gdAxis axis)
+	private void
+				  _gdScaleOneAxis(GdImage pSrc, GdImage dst,
+								  int dst_len, int row, LineContribType contrib,
+								  GdAxis axis)
 	{
-		unsigned int ndx;
+		int ndx;
 
 		for (ndx = 0; ndx < dst_len; ndx++) {
 			double r = 0, g = 0, b = 0, a = 0;
-			const int left = contrib->ContribRow[ndx].Left;
-			const int right = contrib->ContribRow[ndx].Right;
-			int *dest = (axis == HORIZONTAL) ?
-			&dst->tpixels[row][ndx] :
-			&dst->tpixels[ndx][row];
-
-			int i;
+			final int left = contrib.ContribRow[ndx].Left;
+			final int right = contrib.ContribRow[ndx].Right;
 
 		/* Accumulate each channel */
-			for (i = left; i <= right; i++) {
-				const int left_channel = i - left;
-				const int srcpx = (axis == HORIZONTAL) ?
-						pSrc->tpixels[row][i] :
-						pSrc->tpixels[i][row];
+			for (int i = left; i <= right; i++) {
+				final int left_channel = i - left;
+				final int srcpx;
+				if (axis == GdAxis.HORIZONTAL) {
+					srcpx = pSrc.tpixels[row][i];
+				} else {
+					srcpx = pSrc.tpixels[i][row];
+				}
 
-				r += contrib->ContribRow[ndx].Weights[left_channel]
-						* (double)(gdTrueColorGetRed(srcpx));
-				g += contrib->ContribRow[ndx].Weights[left_channel]
-						* (double)(gdTrueColorGetGreen(srcpx));
-				b += contrib->ContribRow[ndx].Weights[left_channel]
-						* (double)(gdTrueColorGetBlue(srcpx));
-				a += contrib->ContribRow[ndx].Weights[left_channel]
-						* (double)(gdTrueColorGetAlpha(srcpx));
+				r += contrib.ContribRow[ndx].Weights[left_channel]
+						* (double)(GdUtils.trueColorGetRed(srcpx));
+				g += contrib.ContribRow[ndx].Weights[left_channel]
+						* (double)(GdUtils.trueColorGetGreen(srcpx));
+				b += contrib.ContribRow[ndx].Weights[left_channel]
+						* (double)(GdUtils.trueColorGetBlue(srcpx));
+				a += contrib.ContribRow[ndx].Weights[left_channel]
+						* (double)(GdUtils.trueColorGetAlpha(srcpx));
 			}/* for */
 
-			*dest = gdTrueColorAlpha(uchar_clamp(r, 0xFF), uchar_clamp(g, 0xFF),
+			final int dest_val = GdUtils.trueColorMixAlpha(uchar_clamp(r, 0xFF), uchar_clamp(g, 0xFF),
 					uchar_clamp(b, 0xFF),
 					uchar_clamp(a, 0x7F)); /* alpha is 0..127 */
+			if (axis == GdAxis.HORIZONTAL) {
+				dst.tpixels[row][ndx] = dest_val;
+				dst.tpixels[ndx][row] = dest_val;
+			}
 		}/* for */
 	}/* _gdScaleOneAxis*/
 
 
-	static inline int
-				  _gdScalePass(const gdImagePtr pSrc, const unsigned int src_len,
-							   const gdImagePtr pDst, const unsigned int dst_len,
-							   const unsigned int num_lines,
-							   const gdAxis axis)
+	private int _gdScalePass(final GdImage pSrc, final int src_len,
+							   final GdImage pDst, final int dst_len,
+							   final int num_lines,
+							   final GdAxis axis)
 	{
-		unsigned int line_ndx;
-		LineContribType * contrib;
+		int line_ndx;
+		LineContribType contrib;
 
     /* Same dim, just copy it. */
 		assert(dst_len != src_len); // TODO: caller should handle this.
 
 		contrib = _gdContributionsCalc(dst_len, src_len,
 				(double)dst_len / (double)src_len,
-				pSrc->interpolation);
-		if (contrib == NULL) {
+				pSrc.interpolation);
+		if (contrib == null) {
 			return 0;
 		}
 
@@ -4003,29 +3987,28 @@ TODO:
 		for (line_ndx = 0; line_ndx < num_lines; line_ndx++) {
 			_gdScaleOneAxis(pSrc, pDst, dst_len, line_ndx, contrib, axis);
 		}
-		_gdContributionsFree (contrib);
 
 		return 1;
 	}/* _gdScalePass*/
 
 
-	static gdImagePtr
-	gdImageScaleTwoPass(const gdImagePtr src, const unsigned int new_width,
-						const unsigned int new_height)
+	private GdImage
+	gdImageScaleTwoPass(final GdImage src, final int new_width,
+						final int new_height)
 	{
-		const unsigned int src_width = src->sx;
-		const unsigned int src_height = src->sy;
-		gdImagePtr tmp_im = NULL;
-		gdImagePtr dst = NULL;
+		final int src_width = src.sx;
+		final int src_height = src.sy;
+		GdImage tmp_im = null;
+		GdImage dst = null;
 
     /* First, handle the trivial case. */
 		if (src_width == new_width && src_height == new_height) {
-			return gdImageClone(src);
+			return src.imageClone();
 		}/* if */
 
 	/* Convert to truecolor if it isn't; this code requires it. */
-		if (!src->trueColor) {
-			gdImagePaletteToTrueColor(src);
+		if (!src.trueColor) {
+			src.paletteToTrueColor();
 		}/* if */
 
     /* Scale horizontally unless sizes are the same. */
@@ -4033,10 +4016,10 @@ TODO:
 			tmp_im = src;
 		} else {
 			tmp_im = gdImageCreateTrueColor(new_width, src_height);
-			if (tmp_im == NULL) {
-				return NULL;
+			if (tmp_im == null) {
+				return null;
 			}
-			gdImageSetInterpolationMethod(tmp_im, src->interpolation_id);
+			gdImageSetInterpolationMethod(tmp_im, src.interpolation_id);
 
 			_gdScalePass(src, src_width, tmp_im, new_width, src_height, HORIZONTAL);
 		}/* if .. else*/
@@ -4049,7 +4032,7 @@ TODO:
 
     /* Otherwise, we need to scale vertically. */
 		dst = gdImageCreateTrueColor(new_width, new_height);
-		if (dst != NULL) {
+		if (dst != null) {
 			gdImageSetInterpolationMethod(dst, src->interpolation_id);
 			_gdScalePass(tmp_im, src_height, dst, new_height, new_width, VERTICAL);
 		}/* if */
@@ -4072,51 +4055,51 @@ TODO:
 		pre scale very large images before using another interpolation
 		methods for the last step.
 	*/
-	static gdImagePtr
-	gdImageScaleNearestNeighbour(gdImagePtr im, const unsigned int width, const unsigned int height)
+	private GdImage
+	gdImageScaleNearestNeighbour(final int width, final int height)
 	{
-		const unsigned long new_width = MAX(1, width);
-		const unsigned long new_height = MAX(1, height);
-		const float dx = (float)im->sx / (float)new_width;
-		const float dy = (float)im->sy / (float)new_height;
-		const gdFixed f_dx = gd_ftofx(dx);
-		const gdFixed f_dy = gd_ftofx(dy);
+		final long new_width = MAX(1, width);
+		final long new_height = MAX(1, height);
+		final float dx = (float)this.sx / (float)new_width;
+		final float dy = (float)this.sy / (float)new_height;
+		final long f_dx = gd_ftofx(dx);
+		final long f_dy = gd_ftofx(dy);
 
-		gdImagePtr dst_img;
-		unsigned long  dst_offset_x;
-		unsigned long  dst_offset_y = 0;
-		unsigned int i;
+		GdImage dst_img;
+		long  dst_offset_x;
+		long  dst_offset_y = 0;
+		int i;
 
 		dst_img = gdImageCreateTrueColor(new_width, new_height);
 
-		if (dst_img == NULL) {
-			return NULL;
+		if (dst_img == null) {
+			return null;
 		}
 
 		for (i=0; i<new_height; i++) {
-			unsigned int j;
+			int j;
 			dst_offset_x = 0;
-			if (im->trueColor) {
+			if (this.trueColor) {
 				for (j=0; j<new_width; j++) {
-					const gdFixed f_i = gd_itofx(i);
-					const gdFixed f_j = gd_itofx(j);
-					const gdFixed f_a = gd_mulfx(f_i, f_dy);
-					const gdFixed f_b = gd_mulfx(f_j, f_dx);
-					const long m = gd_fxtoi(f_a);
-					const long n = gd_fxtoi(f_b);
+					final long f_i = gd_itofx(i);
+					final long f_j = gd_itofx(j);
+					final long f_a = gd_mulfx(f_i, f_dy);
+					final long f_b = gd_mulfx(f_j, f_dx);
+					final long m = gd_fxtoi(f_a);
+					final long n = gd_fxtoi(f_b);
 
-					dst_img->tpixels[dst_offset_y][dst_offset_x++] = im->tpixels[m][n];
+					dst_img->tpixels[dst_offset_y][dst_offset_x++] = this.tpixels[m][n];
 				}
 			} else {
 				for (j=0; j<new_width; j++) {
-					const gdFixed f_i = gd_itofx(i);
-					const gdFixed f_j = gd_itofx(j);
-					const gdFixed f_a = gd_mulfx(f_i, f_dy);
-					const gdFixed f_b = gd_mulfx(f_j, f_dx);
-					const long m = gd_fxtoi(f_a);
-					const long n = gd_fxtoi(f_b);
+					final long f_i = gd_itofx(i);
+					final long f_j = gd_itofx(j);
+					final long f_a = gd_mulfx(f_i, f_dy);
+					final long f_b = gd_mulfx(f_j, f_dx);
+					final long m = gd_fxtoi(f_a);
+					final long n = gd_fxtoi(f_b);
 
-					dst_img->tpixels[dst_offset_y][dst_offset_x++] = colorIndex2RGBA(im->pixels[m][n]);
+					dst_img->tpixels[dst_offset_y][dst_offset_x++] = colorIndex2RGBA(this.pixels[m][n]);
 				}
 			}
 			dst_offset_y++;
@@ -4124,136 +4107,136 @@ TODO:
 		return dst_img;
 	}
 
-	static inline int getPixelOverflowColorTC(gdImagePtr im, const int x, const int y, const int color)
+	private int getPixelOverflowColorTC(final int x, final int y, final int color)
 	{
-		if (gdImageBoundsSafe(im, x, y)) {
-			const int c = im->tpixels[y][x];
-			if (c == im->transparent) {
-				return gdTrueColorAlpha(0, 0, 0, 127);
+		if (isBoundsSafe(x, y)) {
+			final int c = this.tpixels[y][x];
+			if (c == this.transparent) {
+				return GdUtils.trueColorMixAlpha(0, 0, 0, 127);
 			}
 			return c;
 		} else {
-			register int border = 0;
-			if (y < im->cy1) {
-				border = im->tpixels[0][im->cx1];
+			int border = 0;
+			if (y < this.cy1) {
+				border = this.tpixels[0][this.cx1];
 				goto processborder;
 			}
 
-			if (y < im->cy1) {
-				border = im->tpixels[0][im->cx1];
+			if (y < this.cy1) {
+				border = this.tpixels[0][this.cx1];
 				goto processborder;
 			}
 
-			if (y > im->cy2) {
-				if (x >= im->cx1 && x <= im->cx1) {
-					border = im->tpixels[im->cy2][x];
+			if (y > this.cy2) {
+				if (x >= this.cx1 && x <= this.cx1) {
+					border = this.tpixels[this.cy2][x];
 					goto processborder;
 				} else {
-					return gdTrueColorAlpha(0, 0, 0, 127);
+					return GdUtils.trueColorMixAlpha(0, 0, 0, 127);
 				}
 			}
 
 		/* y is bound safe at this point */
-			if (x < im->cx1) {
-				border = im->tpixels[y][im->cx1];
+			if (x < this.cx1) {
+				border = this.tpixels[y][this.cx1];
 				goto processborder;
 			}
 
-			if (x > im->cx2) {
-				border = im->tpixels[y][im->cx2];
+			if (x > this.cx2) {
+				border = this.tpixels[y][this.cx2];
 			}
 
 			processborder:
-			if (border == im->transparent) {
-				return gdTrueColorAlpha(0, 0, 0, 127);
+			if (border == this.transparent) {
+				return GdUtils.trueColorMixAlpha(0, 0, 0, 127);
 			} else{
-				return gdTrueColorAlpha(gdTrueColorGetRed(border), gdTrueColorGetGreen(border), gdTrueColorGetBlue(border), 127);
+				return GdUtils.trueColorMixAlpha(GdUtils.trueColorGetRed(border), GdUtils.trueColorGetGreen(border), GdUtils.trueColorGetBlue(border), 127);
 			}
 		}
 	}
 
-	static gdImagePtr gdImageScaleBilinearPalette(gdImagePtr im, const unsigned int new_width, const unsigned int new_height)
+	private GdImage gdImageScaleBilinearPalette(final int new_width, final int new_height)
 	{
 		long _width = MAX(1, new_width);
 		long _height = MAX(1, new_height);
 		float dx = (float)gdImageSX(im) / (float)_width;
 		float dy = (float)gdImageSY(im) / (float)_height;
-		gdFixed f_dx = gd_ftofx(dx);
-		gdFixed f_dy = gd_ftofx(dy);
-		gdFixed f_1 = gd_itofx(1);
+		long f_dx = gd_ftofx(dx);
+		long f_dy = gd_ftofx(dy);
+		long f_1 = gd_itofx(1);
 
 		int dst_offset_h;
 		int dst_offset_v = 0;
 		long i;
-		gdImagePtr new_img;
-		const int transparent = im->transparent;
+		GdImage new_img;
+		final int transparent = this.transparent;
 
 		new_img = gdImageCreateTrueColor(new_width, new_height);
-		if (new_img == NULL) {
-			return NULL;
+		if (new_img == null) {
+			return null;
 		}
-		new_img->transparent = gdTrueColorAlpha(im->red[transparent], im->green[transparent], im->blue[transparent], im->alpha[transparent]);
+		new_img->transparent = GdUtils.trueColorMixAlpha(this.red[transparent], this.green[transparent], this.blue[transparent], this.alpha[transparent]);
 
 		for (i=0; i < _height; i++) {
 			long j;
-			const gdFixed f_i = gd_itofx(i);
-			const gdFixed f_a = gd_mulfx(f_i, f_dy);
-			register long m = gd_fxtoi(f_a);
+			final long f_i = gd_itofx(i);
+			final long f_a = gd_mulfx(f_i, f_dy);
+			long m = gd_fxtoi(f_a);
 
 			dst_offset_h = 0;
 
 			for (j=0; j < _width; j++) {
 			/* Update bitmap */
-				gdFixed f_j = gd_itofx(j);
-				gdFixed f_b = gd_mulfx(f_j, f_dx);
+				long f_j = gd_itofx(j);
+				long f_b = gd_mulfx(f_j, f_dx);
 
-				const long n = gd_fxtoi(f_b);
-				gdFixed f_f = f_a - gd_itofx(m);
-				gdFixed f_g = f_b - gd_itofx(n);
+				final long n = gd_fxtoi(f_b);
+				long f_f = f_a - gd_itofx(m);
+				long f_g = f_b - gd_itofx(n);
 
-				const gdFixed f_w1 = gd_mulfx(f_1-f_f, f_1-f_g);
-				const gdFixed f_w2 = gd_mulfx(f_1-f_f, f_g);
-				const gdFixed f_w3 = gd_mulfx(f_f, f_1-f_g);
-				const gdFixed f_w4 = gd_mulfx(f_f, f_g);
-				unsigned int pixel1;
-				unsigned int pixel2;
-				unsigned int pixel3;
-				unsigned int pixel4;
-				register gdFixed f_r1, f_r2, f_r3, f_r4,
+				final long f_w1 = gd_mulfx(f_1-f_f, f_1-f_g);
+				final long f_w2 = gd_mulfx(f_1-f_f, f_g);
+				final long f_w3 = gd_mulfx(f_f, f_1-f_g);
+				final long f_w4 = gd_mulfx(f_f, f_g);
+				int pixel1;
+				int pixel2;
+				int pixel3;
+				int pixel4;
+				long f_r1, f_r2, f_r3, f_r4,
 						f_g1, f_g2, f_g3, f_g4,
 						f_b1, f_b2, f_b3, f_b4,
 						f_a1, f_a2, f_a3, f_a4;
 
 			/* zero for the background color, nothig gets outside anyway */
-				pixel1 = getPixelOverflowPalette(im, n, m, 0);
-				pixel2 = getPixelOverflowPalette(im, n + 1, m, 0);
-				pixel3 = getPixelOverflowPalette(im, n, m + 1, 0);
-				pixel4 = getPixelOverflowPalette(im, n + 1, m + 1, 0);
+				pixel1 = getPixelOverflowPalette(n, m, 0);
+				pixel2 = getPixelOverflowPalette(n + 1, m, 0);
+				pixel3 = getPixelOverflowPalette(n, m + 1, 0);
+				pixel4 = getPixelOverflowPalette(n + 1, m + 1, 0);
 
-				f_r1 = gd_itofx(gdTrueColorGetRed(pixel1));
-				f_r2 = gd_itofx(gdTrueColorGetRed(pixel2));
-				f_r3 = gd_itofx(gdTrueColorGetRed(pixel3));
-				f_r4 = gd_itofx(gdTrueColorGetRed(pixel4));
-				f_g1 = gd_itofx(gdTrueColorGetGreen(pixel1));
-				f_g2 = gd_itofx(gdTrueColorGetGreen(pixel2));
-				f_g3 = gd_itofx(gdTrueColorGetGreen(pixel3));
-				f_g4 = gd_itofx(gdTrueColorGetGreen(pixel4));
-				f_b1 = gd_itofx(gdTrueColorGetBlue(pixel1));
-				f_b2 = gd_itofx(gdTrueColorGetBlue(pixel2));
-				f_b3 = gd_itofx(gdTrueColorGetBlue(pixel3));
-				f_b4 = gd_itofx(gdTrueColorGetBlue(pixel4));
-				f_a1 = gd_itofx(gdTrueColorGetAlpha(pixel1));
-				f_a2 = gd_itofx(gdTrueColorGetAlpha(pixel2));
-				f_a3 = gd_itofx(gdTrueColorGetAlpha(pixel3));
-				f_a4 = gd_itofx(gdTrueColorGetAlpha(pixel4));
+				f_r1 = gd_itofx(GdUtils.trueColorGetRed(pixel1));
+				f_r2 = gd_itofx(GdUtils.trueColorGetRed(pixel2));
+				f_r3 = gd_itofx(GdUtils.trueColorGetRed(pixel3));
+				f_r4 = gd_itofx(GdUtils.trueColorGetRed(pixel4));
+				f_g1 = gd_itofx(GdUtils.trueColorGetGreen(pixel1));
+				f_g2 = gd_itofx(GdUtils.trueColorGetGreen(pixel2));
+				f_g3 = gd_itofx(GdUtils.trueColorGetGreen(pixel3));
+				f_g4 = gd_itofx(GdUtils.trueColorGetGreen(pixel4));
+				f_b1 = gd_itofx(GdUtils.trueColorGetBlue(pixel1));
+				f_b2 = gd_itofx(GdUtils.trueColorGetBlue(pixel2));
+				f_b3 = gd_itofx(GdUtils.trueColorGetBlue(pixel3));
+				f_b4 = gd_itofx(GdUtils.trueColorGetBlue(pixel4));
+				f_a1 = gd_itofx(GdUtils.trueColorGetAlpha(pixel1));
+				f_a2 = gd_itofx(GdUtils.trueColorGetAlpha(pixel2));
+				f_a3 = gd_itofx(GdUtils.trueColorGetAlpha(pixel3));
+				f_a4 = gd_itofx(GdUtils.trueColorGetAlpha(pixel4));
 
 				{
-					const char red = (char) gd_fxtoi(gd_mulfx(f_w1, f_r1) + gd_mulfx(f_w2, f_r2) + gd_mulfx(f_w3, f_r3) + gd_mulfx(f_w4, f_r4));
-					const char green = (char) gd_fxtoi(gd_mulfx(f_w1, f_g1) + gd_mulfx(f_w2, f_g2) + gd_mulfx(f_w3, f_g3) + gd_mulfx(f_w4, f_g4));
-					const char blue = (char) gd_fxtoi(gd_mulfx(f_w1, f_b1) + gd_mulfx(f_w2, f_b2) + gd_mulfx(f_w3, f_b3) + gd_mulfx(f_w4, f_b4));
-					const char alpha = (char) gd_fxtoi(gd_mulfx(f_w1, f_a1) + gd_mulfx(f_w2, f_a2) + gd_mulfx(f_w3, f_a3) + gd_mulfx(f_w4, f_a4));
+					final char red = (char) gd_fxtoi(gd_mulfx(f_w1, f_r1) + gd_mulfx(f_w2, f_r2) + gd_mulfx(f_w3, f_r3) + gd_mulfx(f_w4, f_r4));
+					final char green = (char) gd_fxtoi(gd_mulfx(f_w1, f_g1) + gd_mulfx(f_w2, f_g2) + gd_mulfx(f_w3, f_g3) + gd_mulfx(f_w4, f_g4));
+					final char blue = (char) gd_fxtoi(gd_mulfx(f_w1, f_b1) + gd_mulfx(f_w2, f_b2) + gd_mulfx(f_w3, f_b3) + gd_mulfx(f_w4, f_b4));
+					final char alpha = (char) gd_fxtoi(gd_mulfx(f_w1, f_a1) + gd_mulfx(f_w2, f_a2) + gd_mulfx(f_w3, f_a3) + gd_mulfx(f_w4, f_a4));
 
-					new_img->tpixels[dst_offset_v][dst_offset_h] = gdTrueColorAlpha(red, green, blue, alpha);
+					new_img->tpixels[dst_offset_v][dst_offset_h] = GdUtils.trueColorMixAlpha(red, green, blue, alpha);
 				}
 
 				dst_offset_h++;
@@ -4264,24 +4247,24 @@ TODO:
 		return new_img;
 	}
 
-	static gdImagePtr gdImageScaleBilinearTC(gdImagePtr im, const unsigned int new_width, const unsigned int new_height)
+	private GdImage gdImageScaleBilinearTC(final int new_width, final int new_height)
 	{
 		long dst_w = MAX(1, new_width);
 		long dst_h = MAX(1, new_height);
 		float dx = (float)gdImageSX(im) / (float)dst_w;
 		float dy = (float)gdImageSY(im) / (float)dst_h;
-		gdFixed f_dx = gd_ftofx(dx);
-		gdFixed f_dy = gd_ftofx(dy);
-		gdFixed f_1 = gd_itofx(1);
+		long f_dx = gd_ftofx(dx);
+		long f_dy = gd_ftofx(dy);
+		long f_1 = gd_itofx(1);
 
 		int dst_offset_h;
 		int dst_offset_v = 0;
 		long i;
-		gdImagePtr new_img;
+		GdImage new_img;
 
 		new_img = gdImageCreateTrueColor(new_width, new_height);
 		if (!new_img){
-			return NULL;
+			return null;
 		}
 
 		for (i=0; i < dst_h; i++) {
@@ -4289,56 +4272,56 @@ TODO:
 			dst_offset_h = 0;
 			for (j=0; j < dst_w; j++) {
 			/* Update bitmap */
-				gdFixed f_i = gd_itofx(i);
-				gdFixed f_j = gd_itofx(j);
-				gdFixed f_a = gd_mulfx(f_i, f_dy);
-				gdFixed f_b = gd_mulfx(f_j, f_dx);
-				const gdFixed m = gd_fxtoi(f_a);
-				const gdFixed n = gd_fxtoi(f_b);
-				gdFixed f_f = f_a - gd_itofx(m);
-				gdFixed f_g = f_b - gd_itofx(n);
+				long f_i = gd_itofx(i);
+				long f_j = gd_itofx(j);
+				long f_a = gd_mulfx(f_i, f_dy);
+				long f_b = gd_mulfx(f_j, f_dx);
+				final long m = gd_fxtoi(f_a);
+				final long n = gd_fxtoi(f_b);
+				long f_f = f_a - gd_itofx(m);
+				long f_g = f_b - gd_itofx(n);
 
-				const gdFixed f_w1 = gd_mulfx(f_1-f_f, f_1-f_g);
-				const gdFixed f_w2 = gd_mulfx(f_1-f_f, f_g);
-				const gdFixed f_w3 = gd_mulfx(f_f, f_1-f_g);
-				const gdFixed f_w4 = gd_mulfx(f_f, f_g);
-				unsigned int pixel1;
-				unsigned int pixel2;
-				unsigned int pixel3;
-				unsigned int pixel4;
-				register gdFixed f_r1, f_r2, f_r3, f_r4,
+				final long f_w1 = gd_mulfx(f_1-f_f, f_1-f_g);
+				final long f_w2 = gd_mulfx(f_1-f_f, f_g);
+				final long f_w3 = gd_mulfx(f_f, f_1-f_g);
+				final long f_w4 = gd_mulfx(f_f, f_g);
+				int pixel1;
+				int pixel2;
+				int pixel3;
+				int pixel4;
+				long f_r1, f_r2, f_r3, f_r4,
 						f_g1, f_g2, f_g3, f_g4,
 						f_b1, f_b2, f_b3, f_b4,
 						f_a1, f_a2, f_a3, f_a4;
 			/* 0 for bgColor, nothing gets outside anyway */
-				pixel1 = getPixelOverflowTC(im, n, m, 0);
-				pixel2 = getPixelOverflowTC(im, n + 1, m, 0);
-				pixel3 = getPixelOverflowTC(im, n, m + 1, 0);
-				pixel4 = getPixelOverflowTC(im, n + 1, m + 1, 0);
+				pixel1 = getPixelOverflowTC(n, m, 0);
+				pixel2 = getPixelOverflowTC(n + 1, m, 0);
+				pixel3 = getPixelOverflowTC(n, m + 1, 0);
+				pixel4 = getPixelOverflowTC(n + 1, m + 1, 0);
 
-				f_r1 = gd_itofx(gdTrueColorGetRed(pixel1));
-				f_r2 = gd_itofx(gdTrueColorGetRed(pixel2));
-				f_r3 = gd_itofx(gdTrueColorGetRed(pixel3));
-				f_r4 = gd_itofx(gdTrueColorGetRed(pixel4));
-				f_g1 = gd_itofx(gdTrueColorGetGreen(pixel1));
-				f_g2 = gd_itofx(gdTrueColorGetGreen(pixel2));
-				f_g3 = gd_itofx(gdTrueColorGetGreen(pixel3));
-				f_g4 = gd_itofx(gdTrueColorGetGreen(pixel4));
-				f_b1 = gd_itofx(gdTrueColorGetBlue(pixel1));
-				f_b2 = gd_itofx(gdTrueColorGetBlue(pixel2));
-				f_b3 = gd_itofx(gdTrueColorGetBlue(pixel3));
-				f_b4 = gd_itofx(gdTrueColorGetBlue(pixel4));
-				f_a1 = gd_itofx(gdTrueColorGetAlpha(pixel1));
-				f_a2 = gd_itofx(gdTrueColorGetAlpha(pixel2));
-				f_a3 = gd_itofx(gdTrueColorGetAlpha(pixel3));
-				f_a4 = gd_itofx(gdTrueColorGetAlpha(pixel4));
+				f_r1 = gd_itofx(GdUtils.trueColorGetRed(pixel1));
+				f_r2 = gd_itofx(GdUtils.trueColorGetRed(pixel2));
+				f_r3 = gd_itofx(GdUtils.trueColorGetRed(pixel3));
+				f_r4 = gd_itofx(GdUtils.trueColorGetRed(pixel4));
+				f_g1 = gd_itofx(GdUtils.trueColorGetGreen(pixel1));
+				f_g2 = gd_itofx(GdUtils.trueColorGetGreen(pixel2));
+				f_g3 = gd_itofx(GdUtils.trueColorGetGreen(pixel3));
+				f_g4 = gd_itofx(GdUtils.trueColorGetGreen(pixel4));
+				f_b1 = gd_itofx(GdUtils.trueColorGetBlue(pixel1));
+				f_b2 = gd_itofx(GdUtils.trueColorGetBlue(pixel2));
+				f_b3 = gd_itofx(GdUtils.trueColorGetBlue(pixel3));
+				f_b4 = gd_itofx(GdUtils.trueColorGetBlue(pixel4));
+				f_a1 = gd_itofx(GdUtils.trueColorGetAlpha(pixel1));
+				f_a2 = gd_itofx(GdUtils.trueColorGetAlpha(pixel2));
+				f_a3 = gd_itofx(GdUtils.trueColorGetAlpha(pixel3));
+				f_a4 = gd_itofx(GdUtils.trueColorGetAlpha(pixel4));
 				{
-					const unsigned char red   = (unsigned char) gd_fxtoi(gd_mulfx(f_w1, f_r1) + gd_mulfx(f_w2, f_r2) + gd_mulfx(f_w3, f_r3) + gd_mulfx(f_w4, f_r4));
-					const unsigned char green = (unsigned char) gd_fxtoi(gd_mulfx(f_w1, f_g1) + gd_mulfx(f_w2, f_g2) + gd_mulfx(f_w3, f_g3) + gd_mulfx(f_w4, f_g4));
-					const unsigned char blue  = (unsigned char) gd_fxtoi(gd_mulfx(f_w1, f_b1) + gd_mulfx(f_w2, f_b2) + gd_mulfx(f_w3, f_b3) + gd_mulfx(f_w4, f_b4));
-					const unsigned char alpha = (unsigned char) gd_fxtoi(gd_mulfx(f_w1, f_a1) + gd_mulfx(f_w2, f_a2) + gd_mulfx(f_w3, f_a3) + gd_mulfx(f_w4, f_a4));
+					final char red   = (char) gd_fxtoi(gd_mulfx(f_w1, f_r1) + gd_mulfx(f_w2, f_r2) + gd_mulfx(f_w3, f_r3) + gd_mulfx(f_w4, f_r4));
+					final char green = (char) gd_fxtoi(gd_mulfx(f_w1, f_g1) + gd_mulfx(f_w2, f_g2) + gd_mulfx(f_w3, f_g3) + gd_mulfx(f_w4, f_g4));
+					final char blue  = (char) gd_fxtoi(gd_mulfx(f_w1, f_b1) + gd_mulfx(f_w2, f_b2) + gd_mulfx(f_w3, f_b3) + gd_mulfx(f_w4, f_b4));
+					final char alpha = (char) gd_fxtoi(gd_mulfx(f_w1, f_a1) + gd_mulfx(f_w2, f_a2) + gd_mulfx(f_w3, f_a3) + gd_mulfx(f_w4, f_a4));
 
-					new_img->tpixels[dst_offset_v][dst_offset_h] = gdTrueColorAlpha(red, green, blue, alpha);
+					new_img->tpixels[dst_offset_v][dst_offset_h] = GdUtils.trueColorMixAlpha(red, green, blue, alpha);
 				}
 
 				dst_offset_h++;
@@ -4349,48 +4332,48 @@ TODO:
 		return new_img;
 	}
 
-	static gdImagePtr
-	gdImageScaleBilinear(gdImagePtr im, const unsigned int new_width,
-						 const unsigned int new_height)
+	private GdImage
+	gdImageScaleBilinear(final int new_width,
+						 final int new_height)
 	{
-		if (im->trueColor) {
-			return gdImageScaleBilinearTC(im, new_width, new_height);
+		if (this.trueColor) {
+			return gdImageScaleBilinearTC(new_width, new_height);
 		} else {
-			return gdImageScaleBilinearPalette(im, new_width, new_height);
+			return gdImageScaleBilinearPalette(new_width, new_height);
 		}
 	}
 
-	static gdImagePtr
-	gdImageScaleBicubicFixed(gdImagePtr src, const unsigned int width,
-							 const unsigned int height)
+	private GdImage
+	gdImageScaleBicubicFixed(GdImage src, final int width,
+							 final int height)
 	{
-		const long new_width = MAX(1, width);
-		const long new_height = MAX(1, height);
-		const int src_w = gdImageSX(src);
-		const int src_h = gdImageSY(src);
-		const gdFixed f_dx = gd_ftofx((float)src_w / (float)new_width);
-		const gdFixed f_dy = gd_ftofx((float)src_h / (float)new_height);
-		const gdFixed f_1 = gd_itofx(1);
-		const gdFixed f_2 = gd_itofx(2);
-		const gdFixed f_4 = gd_itofx(4);
-		const gdFixed f_6 = gd_itofx(6);
-		const gdFixed f_gamma = gd_ftofx(1.04f);
-		gdImagePtr dst;
+		final long new_width = MAX(1, width);
+		final long new_height = MAX(1, height);
+		final int src_w = gdImageSX(src);
+		final int src_h = gdImageSY(src);
+		final long f_dx = gd_ftofx((float)src_w / (float)new_width);
+		final long f_dy = gd_ftofx((float)src_h / (float)new_height);
+		final long f_1 = gd_itofx(1);
+		final long f_2 = gd_itofx(2);
+		final long f_4 = gd_itofx(4);
+		final long f_6 = gd_itofx(6);
+		final long f_gamma = gd_ftofx(1.04f);
+		GdImage dst;
 
-		unsigned int dst_offset_x;
-		unsigned int dst_offset_y = 0;
+		int dst_offset_x;
+		int dst_offset_y = 0;
 		long i;
 
 	/* impact perf a bit, but not that much. Implementation for palette
 	   images can be done at a later point.
 	*/
-		if (src->trueColor == 0) {
-			gdImagePaletteToTrueColor(src);
+		if (!src.trueColor) {
+			src.paletteToTrueColor();
 		}
 
 		dst = gdImageCreateTrueColor(new_width, new_height);
 		if (!dst) {
-			return NULL;
+			return null;
 		}
 
 		dst->saveAlphaFlag = 1;
@@ -4400,16 +4383,16 @@ TODO:
 			dst_offset_x = 0;
 
 			for (j=0; j < new_width; j++) {
-				const gdFixed f_a = gd_mulfx(gd_itofx(i), f_dy);
-				const gdFixed f_b = gd_mulfx(gd_itofx(j), f_dx);
-				const long m = gd_fxtoi(f_a);
-				const long n = gd_fxtoi(f_b);
-				const gdFixed f_f = f_a - gd_itofx(m);
-				const gdFixed f_g = f_b - gd_itofx(n);
-				unsigned int src_offset_x[16], src_offset_y[16];
+				final long f_a = gd_mulfx(gd_itofx(i), f_dy);
+				final long f_b = gd_mulfx(gd_itofx(j), f_dx);
+				final long m = gd_fxtoi(f_a);
+				final long n = gd_fxtoi(f_b);
+				final long f_f = f_a - gd_itofx(m);
+				final long f_g = f_b - gd_itofx(n);
+				int src_offset_x[16], src_offset_y[16];
 				long k;
-				register gdFixed f_red = 0, f_green = 0, f_blue = 0, f_alpha = 0;
-				unsigned char red, green, blue, alpha = 0;
+				long f_red = 0, f_green = 0, f_blue = 0, f_alpha = 0;
+				char red, green, blue, alpha = 0;
 				int *dst_row = dst->tpixels[dst_offset_y];
 
 				if ((m < 1) || (n < 1)) {
@@ -4535,12 +4518,12 @@ TODO:
 				}
 
 				for (k = -1; k < 3; k++) {
-					const gdFixed f = gd_itofx(k)-f_f;
-					const gdFixed f_fm1 = f - f_1;
-					const gdFixed f_fp1 = f + f_1;
-					const gdFixed f_fp2 = f + f_2;
-					register gdFixed f_a = 0, f_b = 0, f_d = 0, f_c = 0;
-					register gdFixed f_RY;
+					final long f = gd_itofx(k)-f_f;
+					final long f_fm1 = f - f_1;
+					final long f_fp1 = f + f_1;
+					final long f_fp2 = f + f_2;
+					long f_a = 0, f_b = 0, f_d = 0, f_c = 0;
+					long f_RY;
 					int l;
 
 					if (f_fp2 > 0) f_a = gd_mulfx(f_fp2, gd_mulfx(f_fp2,f_fp2));
@@ -4551,14 +4534,14 @@ TODO:
 					f_RY = gd_divfx((f_a - gd_mulfx(f_4,f_b) + gd_mulfx(f_6,f_c) - gd_mulfx(f_4,f_d)),f_6);
 
 					for (l = -1; l < 3; l++) {
-						const gdFixed f = gd_itofx(l) - f_g;
-						const gdFixed f_fm1 = f - f_1;
-						const gdFixed f_fp1 = f + f_1;
-						const gdFixed f_fp2 = f + f_2;
-						register gdFixed f_a = 0, f_b = 0, f_c = 0, f_d = 0;
-						register gdFixed f_RX, f_R, f_rs, f_gs, f_bs, f_ba;
-						register int c;
-						const int _k = ((k+1)*4) + (l+1);
+						final long f = gd_itofx(l) - f_g;
+						final long f_fm1 = f - f_1;
+						final long f_fp1 = f + f_1;
+						final long f_fp2 = f + f_2;
+						long f_a = 0, f_b = 0, f_c = 0, f_d = 0;
+						long f_RX, f_R, f_rs, f_gs, f_bs, f_ba;
+						int c;
+						final int _k = ((k+1)*4) + (l+1);
 
 						if (f_fp2 > 0) f_a = gd_mulfx(f_fp2,gd_mulfx(f_fp2,f_fp2));
 
@@ -4572,10 +4555,10 @@ TODO:
 						f_R = gd_mulfx(f_RY,f_RX);
 
 						c = src->tpixels[*(src_offset_y + _k)][*(src_offset_x + _k)];
-						f_rs = gd_itofx(gdTrueColorGetRed(c));
-						f_gs = gd_itofx(gdTrueColorGetGreen(c));
-						f_bs = gd_itofx(gdTrueColorGetBlue(c));
-						f_ba = gd_itofx(gdTrueColorGetAlpha(c));
+						f_rs = gd_itofx(GdUtils.trueColorGetRed(c));
+						f_gs = gd_itofx(GdUtils.trueColorGetGreen(c));
+						f_bs = gd_itofx(GdUtils.trueColorGetBlue(c));
+						f_ba = gd_itofx(GdUtils.trueColorGetAlpha(c));
 
 						f_red += gd_mulfx(f_rs,f_R);
 						f_green += gd_mulfx(f_gs,f_R);
@@ -4584,12 +4567,12 @@ TODO:
 					}
 				}
 
-				red    = (unsigned char) CLAMP(gd_fxtoi(gd_mulfx(f_red,   f_gamma)),  0, 255);
-				green  = (unsigned char) CLAMP(gd_fxtoi(gd_mulfx(f_green, f_gamma)),  0, 255);
-				blue   = (unsigned char) CLAMP(gd_fxtoi(gd_mulfx(f_blue,  f_gamma)),  0, 255);
-				alpha  = (unsigned char) CLAMP(gd_fxtoi(gd_mulfx(f_alpha,  f_gamma)), 0, 127);
+				red    = (char) CLAMP(gd_fxtoi(gd_mulfx(f_red,   f_gamma)),  0, 255);
+				green  = (char) CLAMP(gd_fxtoi(gd_mulfx(f_green, f_gamma)),  0, 255);
+				blue   = (char) CLAMP(gd_fxtoi(gd_mulfx(f_blue,  f_gamma)),  0, 255);
+				alpha  = (char) CLAMP(gd_fxtoi(gd_mulfx(f_alpha,  f_gamma)), 0, 127);
 
-				*(dst_row + dst_offset_x) = gdTrueColorAlpha(red, green, blue, alpha);
+				*(dst_row + dst_offset_x) = GdUtils.trueColorMixAlpha(red, green, blue, alpha);
 
 				dst_offset_x++;
 			}
@@ -4598,15 +4581,15 @@ TODO:
 		return dst;
 	}
 
-	BGD_DECLARE(gdImagePtr) gdImageScale(const gdImagePtr src, const unsigned int new_width, const unsigned int new_height)
+	public GdImage gdImageScale(final GdImage src, final int new_width, final int new_height)
 	{
-		gdImagePtr im_scaled = NULL;
+		GdImage im_scaled = null;
 
-		if (src == NULL || src->interpolation_id < 0 || src->interpolation_id > GD_METHOD_COUNT) {
+		if (src == null || src.interpolation_id < 0 || src.interpolation_id > GD_METHOD_COUNT) {
 			return 0;
 		}
 
-		switch (src->interpolation_id) {
+		switch (src.interpolation_id) {
 		/*Special cases, optimized implementations */
 			case GD_NEAREST_NEIGHBOUR:
 				im_scaled = gdImageScaleNearestNeighbour(src, new_width, new_height);
@@ -4622,8 +4605,8 @@ TODO:
 
 		/* generic */
 			default:
-				if (src->interpolation == NULL) {
-					return NULL;
+				if (src.interpolation == null) {
+					return null;
 				}
 				im_scaled = gdImageScaleTwoPass(src, new_width, new_height);
 				break;
@@ -4632,46 +4615,46 @@ TODO:
 		return im_scaled;
 	}
 
-	static gdImagePtr
-	gdImageRotateNearestNeighbour(gdImagePtr src, const float degrees,
-								  const int bgColor)
+	private GdImage
+	gdImageRotateNearestNeighbour(GdImage src, final float degrees,
+								  final int bgColor)
 	{
-		float _angle = ((float) (-degrees / 180.0f) * (float)M_PI);
-		const int src_w  = gdImageSX(src);
-		const int src_h = gdImageSY(src);
-		const unsigned int new_width = (unsigned int)(abs((int)(src_w * cos(_angle))) + abs((int)(src_h * sin(_angle))) + 0.5f);
-		const unsigned int new_height = (unsigned int)(abs((int)(src_w * sin(_angle))) + abs((int)(src_h * cos(_angle))) + 0.5f);
-		const gdFixed f_0_5 = gd_ftofx(0.5f);
-		const gdFixed f_H = gd_itofx(src_h/2);
-		const gdFixed f_W = gd_itofx(src_w/2);
-		const gdFixed f_cos = gd_ftofx(cos(-_angle));
-		const gdFixed f_sin = gd_ftofx(sin(-_angle));
+		float _angle = ((float) (-degrees / 180.0f) * (float)PI);
+		final int src_w  = gdImageSX(src);
+		final int src_h = gdImageSY(src);
+		final int new_width = (int)(abs((int)(src_w * cos(_angle))) + abs((int)(src_h * sin(_angle))) + 0.5f);
+		final int new_height = (int)(abs((int)(src_w * sin(_angle))) + abs((int)(src_h * cos(_angle))) + 0.5f);
+		final long f_0_5 = gd_ftofx(0.5f);
+		final long f_H = gd_itofx(src_h/2);
+		final long f_W = gd_itofx(src_w/2);
+		final long f_cos = gd_ftofx(cos(-_angle));
+		final long f_sin = gd_ftofx(sin(-_angle));
 
-		unsigned int dst_offset_x;
-		unsigned int dst_offset_y = 0;
-		unsigned int i;
-		gdImagePtr dst;
+		int dst_offset_x;
+		int dst_offset_y = 0;
+		int i;
+		GdImage dst;
 
 	/* impact perf a bit, but not that much. Implementation for palette
 	   images can be done at a later point.
 	*/
-		if (src->trueColor == 0) {
-			gdImagePaletteToTrueColor(src);
+		if (!src.trueColor) {
+			src.paletteToTrueColor();
 		}
 
 		dst = gdImageCreateTrueColor(new_width, new_height);
 		if (!dst) {
-			return NULL;
+			return null;
 		}
 		dst->saveAlphaFlag = 1;
 		for (i = 0; i < new_height; i++) {
-			unsigned int j;
+			int j;
 			dst_offset_x = 0;
 			for (j = 0; j < new_width; j++) {
-				gdFixed f_i = gd_itofx((int)i - (int)new_height / 2);
-				gdFixed f_j = gd_itofx((int)j - (int)new_width  / 2);
-				gdFixed f_m = gd_mulfx(f_j,f_sin) + gd_mulfx(f_i,f_cos) + f_0_5 + f_H;
-				gdFixed f_n = gd_mulfx(f_j,f_cos) - gd_mulfx(f_i,f_sin) + f_0_5 + f_W;
+				long f_i = gd_itofx((int)i - (int)new_height / 2);
+				long f_j = gd_itofx((int)j - (int)new_width  / 2);
+				long f_m = gd_mulfx(f_j,f_sin) + gd_mulfx(f_i,f_cos) + f_0_5 + f_H;
+				long f_n = gd_mulfx(f_j,f_cos) - gd_mulfx(f_i,f_sin) + f_0_5 + f_W;
 				long m = gd_fxtoi(f_m);
 				long n = gd_fxtoi(f_n);
 
@@ -4690,64 +4673,64 @@ TODO:
 		return dst;
 	}
 
-	static gdImagePtr
-	gdImageRotateGeneric(gdImagePtr src, const float degrees, const int bgColor)
+	private GdImage
+	gdImageRotateGeneric(GdImage src, final float degrees, final int bgColor)
 	{
-		float _angle = ((float) (-degrees / 180.0f) * (float)M_PI);
-		const int src_w  = gdImageSX(src);
-		const int src_h = gdImageSY(src);
-		const unsigned int new_width = (unsigned int)(abs((int)(src_w * cos(_angle))) + abs((int)(src_h * sin(_angle))) + 0.5f);
-		const unsigned int new_height = (unsigned int)(abs((int)(src_w * sin(_angle))) + abs((int)(src_h * cos(_angle))) + 0.5f);
-		const gdFixed f_0_5 = gd_ftofx(0.5f);
-		const gdFixed f_H = gd_itofx(src_h/2);
-		const gdFixed f_W = gd_itofx(src_w/2);
-		const gdFixed f_cos = gd_ftofx(cos(-_angle));
-		const gdFixed f_sin = gd_ftofx(sin(-_angle));
+		float _angle = ((float) (-degrees / 180.0f) * (float)PI);
+		final int src_w  = gdImageSX(src);
+		final int src_h = gdImageSY(src);
+		final int new_width = (int)(abs((int)(src_w * cos(_angle))) + abs((int)(src_h * sin(_angle))) + 0.5f);
+		final int new_height = (int)(abs((int)(src_w * sin(_angle))) + abs((int)(src_h * cos(_angle))) + 0.5f);
+		final long f_0_5 = gd_ftofx(0.5f);
+		final long f_H = gd_itofx(src_h/2);
+		final long f_W = gd_itofx(src_w/2);
+		final long f_cos = gd_ftofx(cos(-_angle));
+		final long f_sin = gd_ftofx(sin(-_angle));
 
-		unsigned int dst_offset_x;
-		unsigned int dst_offset_y = 0;
-		unsigned int i;
-		gdImagePtr dst;
+		int dst_offset_x;
+		int dst_offset_y = 0;
+		int i;
+		GdImage dst;
 
-		const gdFixed f_slop_y = f_sin;
-		const gdFixed f_slop_x = f_cos;
-		const gdFixed f_slop = f_slop_x > 0 && f_slop_x > 0 ?
+		final long f_slop_y = f_sin;
+		final long f_slop_x = f_cos;
+		final long f_slop = f_slop_x > 0 && f_slop_x > 0 ?
 			f_slop_x > f_slop_y ? gd_divfx(f_slop_y, f_slop_x) : gd_divfx(f_slop_x, f_slop_y)
 			: 0;
 
 		if (bgColor < 0) {
-			return NULL;
+			return null;
 		}
 
 	/* impact perf a bit, but not that much. Implementation for palette
 	   images can be done at a later point.
 	*/
-		if (src->trueColor == 0) {
-			gdImagePaletteToTrueColor(src);
+		if (!src.trueColor) {
+			src.paletteToTrueColor();
 		}
 
 		dst = gdImageCreateTrueColor(new_width, new_height);
 		if (!dst) {
-			return NULL;
+			return null;
 		}
 		dst->saveAlphaFlag = 1;
 
 		for (i = 0; i < new_height; i++) {
-			unsigned int j;
+			int j;
 			dst_offset_x = 0;
 			for (j = 0; j < new_width; j++) {
-				gdFixed f_i = gd_itofx((int)i - (int)new_height / 2);
-				gdFixed f_j = gd_itofx((int)j - (int)new_width  / 2);
-				gdFixed f_m = gd_mulfx(f_j,f_sin) + gd_mulfx(f_i,f_cos) + f_0_5 + f_H;
-				gdFixed f_n = gd_mulfx(f_j,f_cos) - gd_mulfx(f_i,f_sin) + f_0_5 + f_W;
+				long f_i = gd_itofx((int)i - (int)new_height / 2);
+				long f_j = gd_itofx((int)j - (int)new_width  / 2);
+				long f_m = gd_mulfx(f_j,f_sin) + gd_mulfx(f_i,f_cos) + f_0_5 + f_H;
+				long f_n = gd_mulfx(f_j,f_cos) - gd_mulfx(f_i,f_sin) + f_0_5 + f_W;
 				long m = gd_fxtoi(f_m);
 				long n = gd_fxtoi(f_n);
 
 				if ((n <= 0) || (m <= 0) || (m >= src_h) || (n >= src_w)) {
 					dst->tpixels[dst_offset_y][dst_offset_x++] = bgColor;
 				} else if ((n <= 1) || (m <= 1) || (m >= src_h - 1) || (n >= src_w - 1)) {
-					register int c = getPixelInterpolated(src, n, m, bgColor);
-					c = c | (( gdTrueColorGetAlpha(c) + ((int)(127* gd_fxtof(f_slop)))) << 24);
+					int c = getPixelInterpolated(src, n, m, bgColor);
+					c = c | (( GdUtils.trueColorGetAlpha(c) + ((int)(127* gd_fxtof(f_slop)))) << 24);
 
 					dst->tpixels[dst_offset_y][dst_offset_x++] = _color_blend(bgColor, c);
 				} else {
@@ -4759,58 +4742,58 @@ TODO:
 		return dst;
 	}
 
-	static gdImagePtr
-	gdImageRotateBilinear(gdImagePtr src, const float degrees, const int bgColor)
+	private GdImage
+	gdImageRotateBilinear(GdImage src, final float degrees, final int bgColor)
 	{
-		float _angle = (float)((- degrees / 180.0f) * M_PI);
-		const unsigned int src_w = gdImageSX(src);
-		const unsigned int src_h = gdImageSY(src);
-		unsigned int new_width = abs((int)(src_w*cos(_angle))) + abs((int)(src_h*sin(_angle) + 0.5f));
-		unsigned int new_height = abs((int)(src_w*sin(_angle))) + abs((int)(src_h*cos(_angle) + 0.5f));
-		const gdFixed f_0_5 = gd_ftofx(0.5f);
-		const gdFixed f_H = gd_itofx(src_h/2);
-		const gdFixed f_W = gd_itofx(src_w/2);
-		const gdFixed f_cos = gd_ftofx(cos(-_angle));
-		const gdFixed f_sin = gd_ftofx(sin(-_angle));
-		const gdFixed f_1 = gd_itofx(1);
-		unsigned int i;
-		unsigned int dst_offset_x;
-		unsigned int dst_offset_y = 0;
-		unsigned int src_offset_x, src_offset_y;
-		gdImagePtr dst;
+		float _angle = (float)((- degrees / 180.0f) * PI);
+		final int src_w = gdImageSX(src);
+		final int src_h = gdImageSY(src);
+		int new_width = abs((int)(src_w*cos(_angle))) + abs((int)(src_h*sin(_angle) + 0.5f));
+		int new_height = abs((int)(src_w*sin(_angle))) + abs((int)(src_h*cos(_angle) + 0.5f));
+		final long f_0_5 = gd_ftofx(0.5f);
+		final long f_H = gd_itofx(src_h/2);
+		final long f_W = gd_itofx(src_w/2);
+		final long f_cos = gd_ftofx(cos(-_angle));
+		final long f_sin = gd_ftofx(sin(-_angle));
+		final long f_1 = gd_itofx(1);
+		int i;
+		int dst_offset_x;
+		int dst_offset_y = 0;
+		int src_offset_x, src_offset_y;
+		GdImage dst;
 
 	/* impact perf a bit, but not that much. Implementation for palette
 	   images can be done at a later point.
 	*/
-		if (src->trueColor == 0) {
-			gdImagePaletteToTrueColor(src);
+		if (!src.trueColor) {
+			src.paletteToTrueColor();
 		}
 
 		dst = gdImageCreateTrueColor(new_width, new_height);
-		if (dst == NULL) {
-			return NULL;
+		if (dst == null) {
+			return null;
 		}
 		dst->saveAlphaFlag = 1;
 
 		for (i = 0; i < new_height; i++) {
-			unsigned int j;
+			int j;
 			dst_offset_x = 0;
 
 			for (j=0; j < new_width; j++) {
-				const gdFixed f_i = gd_itofx((int)i - (int)new_height / 2);
-				const gdFixed f_j = gd_itofx((int)j - (int)new_width  / 2);
-				const gdFixed f_m = gd_mulfx(f_j,f_sin) + gd_mulfx(f_i,f_cos) + f_0_5 + f_H;
-				const gdFixed f_n = gd_mulfx(f_j,f_cos) - gd_mulfx(f_i,f_sin) + f_0_5 + f_W;
-				const unsigned int m = gd_fxtoi(f_m);
-				const unsigned int n = gd_fxtoi(f_n);
+				final long f_i = gd_itofx((int)i - (int)new_height / 2);
+				final long f_j = gd_itofx((int)j - (int)new_width  / 2);
+				final long f_m = gd_mulfx(f_j,f_sin) + gd_mulfx(f_i,f_cos) + f_0_5 + f_H;
+				final long f_n = gd_mulfx(f_j,f_cos) - gd_mulfx(f_i,f_sin) + f_0_5 + f_W;
+				final int m = gd_fxtoi(f_m);
+				final int n = gd_fxtoi(f_n);
 
 				if ((m > 0) && (m < src_h - 1) && (n > 0) && (n < src_w - 1)) {
-					const gdFixed f_f = f_m - gd_itofx(m);
-					const gdFixed f_g = f_n - gd_itofx(n);
-					const gdFixed f_w1 = gd_mulfx(f_1-f_f, f_1-f_g);
-					const gdFixed f_w2 = gd_mulfx(f_1-f_f, f_g);
-					const gdFixed f_w3 = gd_mulfx(f_f, f_1-f_g);
-					const gdFixed f_w4 = gd_mulfx(f_f, f_g);
+					final long f_f = f_m - gd_itofx(m);
+					final long f_g = f_n - gd_itofx(n);
+					final long f_w1 = gd_mulfx(f_1-f_f, f_1-f_g);
+					final long f_w2 = gd_mulfx(f_1-f_f, f_g);
+					final long f_w3 = gd_mulfx(f_f, f_1-f_g);
+					final long f_w4 = gd_mulfx(f_f, f_g);
 
 					if (n < src_w - 1) {
 						src_offset_x = n + 1;
@@ -4827,8 +4810,8 @@ TODO:
 						src_offset_y = m + 1;
 					}
 					{
-						const int pixel1 = src->tpixels[src_offset_y][src_offset_x];
-						register int pixel2, pixel3, pixel4;
+						final int pixel1 = src->tpixels[src_offset_y][src_offset_x];
+						int pixel2, pixel3, pixel4;
 
 						if (src_offset_y + 1 >= src_h) {
 							pixel2 = bgColor;
@@ -4844,33 +4827,33 @@ TODO:
 							pixel4 = src->tpixels[src_offset_y + 1][src_offset_x + 1];
 						}
 						{
-							const gdFixed f_r1 = gd_itofx(gdTrueColorGetRed(pixel1));
-							const gdFixed f_r2 = gd_itofx(gdTrueColorGetRed(pixel2));
-							const gdFixed f_r3 = gd_itofx(gdTrueColorGetRed(pixel3));
-							const gdFixed f_r4 = gd_itofx(gdTrueColorGetRed(pixel4));
-							const gdFixed f_g1 = gd_itofx(gdTrueColorGetGreen(pixel1));
-							const gdFixed f_g2 = gd_itofx(gdTrueColorGetGreen(pixel2));
-							const gdFixed f_g3 = gd_itofx(gdTrueColorGetGreen(pixel3));
-							const gdFixed f_g4 = gd_itofx(gdTrueColorGetGreen(pixel4));
-							const gdFixed f_b1 = gd_itofx(gdTrueColorGetBlue(pixel1));
-							const gdFixed f_b2 = gd_itofx(gdTrueColorGetBlue(pixel2));
-							const gdFixed f_b3 = gd_itofx(gdTrueColorGetBlue(pixel3));
-							const gdFixed f_b4 = gd_itofx(gdTrueColorGetBlue(pixel4));
-							const gdFixed f_a1 = gd_itofx(gdTrueColorGetAlpha(pixel1));
-							const gdFixed f_a2 = gd_itofx(gdTrueColorGetAlpha(pixel2));
-							const gdFixed f_a3 = gd_itofx(gdTrueColorGetAlpha(pixel3));
-							const gdFixed f_a4 = gd_itofx(gdTrueColorGetAlpha(pixel4));
-							const gdFixed f_red = gd_mulfx(f_w1, f_r1) + gd_mulfx(f_w2, f_r2) + gd_mulfx(f_w3, f_r3) + gd_mulfx(f_w4, f_r4);
-							const gdFixed f_green = gd_mulfx(f_w1, f_g1) + gd_mulfx(f_w2, f_g2) + gd_mulfx(f_w3, f_g3) + gd_mulfx(f_w4, f_g4);
-							const gdFixed f_blue = gd_mulfx(f_w1, f_b1) + gd_mulfx(f_w2, f_b2) + gd_mulfx(f_w3, f_b3) + gd_mulfx(f_w4, f_b4);
-							const gdFixed f_alpha = gd_mulfx(f_w1, f_a1) + gd_mulfx(f_w2, f_a2) + gd_mulfx(f_w3, f_a3) + gd_mulfx(f_w4, f_a4);
+							final long f_r1 = gd_itofx(GdUtils.trueColorGetRed(pixel1));
+							final long f_r2 = gd_itofx(GdUtils.trueColorGetRed(pixel2));
+							final long f_r3 = gd_itofx(GdUtils.trueColorGetRed(pixel3));
+							final long f_r4 = gd_itofx(GdUtils.trueColorGetRed(pixel4));
+							final long f_g1 = gd_itofx(GdUtils.trueColorGetGreen(pixel1));
+							final long f_g2 = gd_itofx(GdUtils.trueColorGetGreen(pixel2));
+							final long f_g3 = gd_itofx(GdUtils.trueColorGetGreen(pixel3));
+							final long f_g4 = gd_itofx(GdUtils.trueColorGetGreen(pixel4));
+							final long f_b1 = gd_itofx(GdUtils.trueColorGetBlue(pixel1));
+							final long f_b2 = gd_itofx(GdUtils.trueColorGetBlue(pixel2));
+							final long f_b3 = gd_itofx(GdUtils.trueColorGetBlue(pixel3));
+							final long f_b4 = gd_itofx(GdUtils.trueColorGetBlue(pixel4));
+							final long f_a1 = gd_itofx(GdUtils.trueColorGetAlpha(pixel1));
+							final long f_a2 = gd_itofx(GdUtils.trueColorGetAlpha(pixel2));
+							final long f_a3 = gd_itofx(GdUtils.trueColorGetAlpha(pixel3));
+							final long f_a4 = gd_itofx(GdUtils.trueColorGetAlpha(pixel4));
+							final long f_red = gd_mulfx(f_w1, f_r1) + gd_mulfx(f_w2, f_r2) + gd_mulfx(f_w3, f_r3) + gd_mulfx(f_w4, f_r4);
+							final long f_green = gd_mulfx(f_w1, f_g1) + gd_mulfx(f_w2, f_g2) + gd_mulfx(f_w3, f_g3) + gd_mulfx(f_w4, f_g4);
+							final long f_blue = gd_mulfx(f_w1, f_b1) + gd_mulfx(f_w2, f_b2) + gd_mulfx(f_w3, f_b3) + gd_mulfx(f_w4, f_b4);
+							final long f_alpha = gd_mulfx(f_w1, f_a1) + gd_mulfx(f_w2, f_a2) + gd_mulfx(f_w3, f_a3) + gd_mulfx(f_w4, f_a4);
 
-							const unsigned char red   = (unsigned char) CLAMP(gd_fxtoi(f_red),   0, 255);
-							const unsigned char green = (unsigned char) CLAMP(gd_fxtoi(f_green), 0, 255);
-							const unsigned char blue  = (unsigned char) CLAMP(gd_fxtoi(f_blue),  0, 255);
-							const unsigned char alpha = (unsigned char) CLAMP(gd_fxtoi(f_alpha), 0, 127);
+							final char red   = (char) CLAMP(gd_fxtoi(f_red),   0, 255);
+							final char green = (char) CLAMP(gd_fxtoi(f_green), 0, 255);
+							final char blue  = (char) CLAMP(gd_fxtoi(f_blue),  0, 255);
+							final char alpha = (char) CLAMP(gd_fxtoi(f_alpha), 0, 127);
 
-							dst->tpixels[dst_offset_y][dst_offset_x++] = gdTrueColorAlpha(red, green, blue, alpha);
+							dst->tpixels[dst_offset_y][dst_offset_x++] = GdUtils.trueColorMixAlpha(red, green, blue, alpha);
 						}
 					}
 				} else {
@@ -4882,62 +4865,62 @@ TODO:
 		return dst;
 	}
 
-	static gdImagePtr
-	gdImageRotateBicubicFixed(gdImagePtr src, const float degrees,const int bgColor)
+	private GdImage
+	gdImageRotateBicubicFixed(GdImage src, final float degrees,final int bgColor)
 	{
-		const float _angle = (float)((- degrees / 180.0f) * M_PI);
-		const int src_w = gdImageSX(src);
-		const int src_h = gdImageSY(src);
-		const unsigned int new_width = abs((int)(src_w*cos(_angle))) + abs((int)(src_h*sin(_angle) + 0.5f));
-		const unsigned int new_height = abs((int)(src_w*sin(_angle))) + abs((int)(src_h*cos(_angle) + 0.5f));
-		const gdFixed f_0_5 = gd_ftofx(0.5f);
-		const gdFixed f_H = gd_itofx(src_h/2);
-		const gdFixed f_W = gd_itofx(src_w/2);
-		const gdFixed f_cos = gd_ftofx(cos(-_angle));
-		const gdFixed f_sin = gd_ftofx(sin(-_angle));
-		const gdFixed f_1 = gd_itofx(1);
-		const gdFixed f_2 = gd_itofx(2);
-		const gdFixed f_4 = gd_itofx(4);
-		const gdFixed f_6 = gd_itofx(6);
-		const gdFixed f_gama = gd_ftofx(1.04f);
+		final float _angle = (float)((- degrees / 180.0f) * PI);
+		final int src_w = gdImageSX(src);
+		final int src_h = gdImageSY(src);
+		final int new_width = abs((int)(src_w*cos(_angle))) + abs((int)(src_h*sin(_angle) + 0.5f));
+		final int new_height = abs((int)(src_w*sin(_angle))) + abs((int)(src_h*cos(_angle) + 0.5f));
+		final long f_0_5 = gd_ftofx(0.5f);
+		final long f_H = gd_itofx(src_h/2);
+		final long f_W = gd_itofx(src_w/2);
+		final long f_cos = gd_ftofx(cos(-_angle));
+		final long f_sin = gd_ftofx(sin(-_angle));
+		final long f_1 = gd_itofx(1);
+		final long f_2 = gd_itofx(2);
+		final long f_4 = gd_itofx(4);
+		final long f_6 = gd_itofx(6);
+		final long f_gama = gd_ftofx(1.04f);
 
-		unsigned int dst_offset_x;
-		unsigned int dst_offset_y = 0;
-		unsigned int i;
-		gdImagePtr dst;
+		int dst_offset_x;
+		int dst_offset_y = 0;
+		int i;
+		GdImage dst;
 
 	/* impact perf a bit, but not that much. Implementation for palette
 	   images can be done at a later point.
 	*/
-		if (src->trueColor == 0) {
-			gdImagePaletteToTrueColor(src);
+		if (!src.trueColor) {
+			src.paletteToTrueColor();
 		}
 
 		dst = gdImageCreateTrueColor(new_width, new_height);
 
-		if (dst == NULL) {
-			return NULL;
+		if (dst == null) {
+			return null;
 		}
 		dst->saveAlphaFlag = 1;
 
 		for (i=0; i < new_height; i++) {
-			unsigned int j;
+			int j;
 			dst_offset_x = 0;
 
 			for (j=0; j < new_width; j++) {
-				const gdFixed f_i = gd_itofx((int)i - (int)new_height / 2);
-				const gdFixed f_j = gd_itofx((int)j - (int)new_width  / 2);
-				const gdFixed f_m = gd_mulfx(f_j,f_sin) + gd_mulfx(f_i,f_cos) + f_0_5 + f_H;
-				const gdFixed f_n = gd_mulfx(f_j,f_cos) - gd_mulfx(f_i,f_sin) + f_0_5 + f_W;
-				const int m = gd_fxtoi(f_m);
-				const int n = gd_fxtoi(f_n);
+				final long f_i = gd_itofx((int)i - (int)new_height / 2);
+				final long f_j = gd_itofx((int)j - (int)new_width  / 2);
+				final long f_m = gd_mulfx(f_j,f_sin) + gd_mulfx(f_i,f_cos) + f_0_5 + f_H;
+				final long f_n = gd_mulfx(f_j,f_cos) - gd_mulfx(f_i,f_sin) + f_0_5 + f_W;
+				final int m = gd_fxtoi(f_m);
+				final int n = gd_fxtoi(f_n);
 
 				if ((m > 0) && (m < src_h - 1) && (n > 0) && (n < src_w-1)) {
-					const gdFixed f_f = f_m - gd_itofx(m);
-					const gdFixed f_g = f_n - gd_itofx(n);
-					unsigned int src_offset_x[16], src_offset_y[16];
-					unsigned char red, green, blue, alpha;
-					gdFixed f_red=0, f_green=0, f_blue=0, f_alpha=0;
+					final long f_f = f_m - gd_itofx(m);
+					final long f_g = f_n - gd_itofx(n);
+					int src_offset_x[16], src_offset_y[16];
+					char red, green, blue, alpha;
+					long f_red=0, f_green=0, f_blue=0, f_alpha=0;
 					int k;
 
 					if ((m < 1) || (n < 1)) {
@@ -5063,12 +5046,12 @@ TODO:
 					}
 
 					for (k=-1; k<3; k++) {
-						const gdFixed f = gd_itofx(k)-f_f;
-						const gdFixed f_fm1 = f - f_1;
-						const gdFixed f_fp1 = f + f_1;
-						const gdFixed f_fp2 = f + f_2;
-						gdFixed f_a = 0, f_b = 0,f_c = 0, f_d = 0;
-						gdFixed f_RY;
+						final long f = gd_itofx(k)-f_f;
+						final long f_fm1 = f - f_1;
+						final long f_fp1 = f + f_1;
+						final long f_fp2 = f + f_2;
+						long f_a = 0, f_b = 0,f_c = 0, f_d = 0;
+						long f_RY;
 						int l;
 
 						if (f_fp2 > 0) {
@@ -5089,15 +5072,15 @@ TODO:
 						f_RY = gd_divfx((f_a-gd_mulfx(f_4,f_b)+gd_mulfx(f_6,f_c)-gd_mulfx(f_4,f_d)),f_6);
 
 						for (l=-1;  l< 3; l++) {
-							const gdFixed f = gd_itofx(l) - f_g;
-							const gdFixed f_fm1 = f - f_1;
-							const gdFixed f_fp1 = f + f_1;
-							const gdFixed f_fp2 = f + f_2;
-							gdFixed f_a = 0, f_b = 0, f_c = 0, f_d = 0;
-							gdFixed f_RX, f_R;
-							const int _k = ((k + 1) * 4) + (l + 1);
-							register gdFixed f_rs, f_gs, f_bs, f_as;
-							register int c;
+							final long f = gd_itofx(l) - f_g;
+							final long f_fm1 = f - f_1;
+							final long f_fp1 = f + f_1;
+							final long f_fp2 = f + f_2;
+							long f_a = 0, f_b = 0, f_c = 0, f_d = 0;
+							long f_RX, f_R;
+							final int _k = ((k + 1) * 4) + (l + 1);
+							long f_rs, f_gs, f_bs, f_as;
+							int c;
 
 							if (f_fp2 > 0) {
 								f_a = gd_mulfx(f_fp2,gd_mulfx(f_fp2,f_fp2));
@@ -5121,7 +5104,7 @@ TODO:
 							if ((src_offset_x[_k] <= 0) || (src_offset_y[_k] <= 0) || (src_offset_y[_k] >= src_h) || (src_offset_x[_k] >= src_w)) {
 								c = bgColor;
 							} else if ((src_offset_x[_k] <= 1) || (src_offset_y[_k] <= 1) || (src_offset_y[_k] >= (int)src_h - 1) || (src_offset_x[_k] >= (int)src_w - 1)) {
-								gdFixed f_127 = gd_itofx(127);
+								long f_127 = gd_itofx(127);
 								c = src->tpixels[src_offset_y[_k]][src_offset_x[_k]];
 								c = c | (( (int) (gd_fxtof(gd_mulfx(f_R, f_127)) + 50.5f)) << 24);
 								c = _color_blend(bgColor, c);
@@ -5129,10 +5112,10 @@ TODO:
 								c = src->tpixels[src_offset_y[_k]][src_offset_x[_k]];
 							}
 
-							f_rs = gd_itofx(gdTrueColorGetRed(c));
-							f_gs = gd_itofx(gdTrueColorGetGreen(c));
-							f_bs = gd_itofx(gdTrueColorGetBlue(c));
-							f_as = gd_itofx(gdTrueColorGetAlpha(c));
+							f_rs = gd_itofx(GdUtils.trueColorGetRed(c));
+							f_gs = gd_itofx(GdUtils.trueColorGetGreen(c));
+							f_bs = gd_itofx(GdUtils.trueColorGetBlue(c));
+							f_as = gd_itofx(GdUtils.trueColorGetAlpha(c));
 
 							f_red   += gd_mulfx(f_rs, f_R);
 							f_green += gd_mulfx(f_gs, f_R);
@@ -5141,12 +5124,12 @@ TODO:
 						}
 					}
 
-					red   = (unsigned char) CLAMP(gd_fxtoi(gd_mulfx(f_red, f_gama)),   0, 255);
-					green = (unsigned char) CLAMP(gd_fxtoi(gd_mulfx(f_green, f_gama)), 0, 255);
-					blue  = (unsigned char) CLAMP(gd_fxtoi(gd_mulfx(f_blue, f_gama)),  0, 255);
-					alpha = (unsigned char) CLAMP(gd_fxtoi(gd_mulfx(f_alpha, f_gama)), 0, 127);
+					red   = (char) CLAMP(gd_fxtoi(gd_mulfx(f_red, f_gama)),   0, 255);
+					green = (char) CLAMP(gd_fxtoi(gd_mulfx(f_green, f_gama)), 0, 255);
+					blue  = (char) CLAMP(gd_fxtoi(gd_mulfx(f_blue, f_gama)),  0, 255);
+					alpha = (char) CLAMP(gd_fxtoi(gd_mulfx(f_alpha, f_gama)), 0, 127);
 
-					dst->tpixels[dst_offset_y][dst_offset_x] =  gdTrueColorAlpha(red, green, blue, alpha);
+					dst->tpixels[dst_offset_y][dst_offset_x] =  GdUtils.trueColorMixAlpha(red, green, blue, alpha);
 				} else {
 					dst->tpixels[dst_offset_y][dst_offset_x] =  bgColor;
 				}
@@ -5158,25 +5141,25 @@ TODO:
 		return dst;
 	}
 
-	BGD_DECLARE(gdImagePtr) gdImageRotateInterpolated(const gdImagePtr src, const float angle, int bgcolor)
+	public GdImage gdImageRotateInterpolated(final GdImage src, final float angle, int bgcolor)
 	{
 	/* round to two decimals and keep the 100x multiplication to use it in the common square angles
 	   case later. Keep the two decimal precisions so smaller rotation steps can be done, useful for
 	   slow animations, f.e. */
-		const int angle_rounded = fmod((int) floorf(angle * 100), 360 * 100);
+		final int angle_rounded = fmod((int) floorf(angle * 100), 360 * 100);
 
 		if (bgcolor < 0) {
-			return NULL;
+			return null;
 		}
 
 	/* 0 && 90 degrees multiple rotation, 0 rotation simply clones the return image and convert it
 	   to truecolor, as we must return truecolor image. */
 		switch (angle_rounded) {
 			case    0: {
-				gdImagePtr dst = gdImageClone(src);
+				GdImage dst = gdImageClone(src);
 
-				if (dst == NULL) {
-					return NULL;
+				if (dst == null) {
+					return null;
 				}
 				if (dst->trueColor == 0) {
 					gdImagePaletteToTrueColor(dst);
@@ -5197,8 +5180,8 @@ TODO:
 				return gdImageRotate270(src, 0);
 		}
 
-		if (src == NULL || src->interpolation_id < 1 || src->interpolation_id > GD_METHOD_COUNT) {
-			return NULL;
+		if (src == null || src->interpolation_id < 1 || src->interpolation_id > GD_METHOD_COUNT) {
+			return null;
 		}
 
 		switch (src->interpolation_id) {
@@ -5217,7 +5200,7 @@ TODO:
 			default:
 				return gdImageRotateGeneric(src, angle, bgcolor);
 		}
-		return NULL;
+		return null;
 	}
 
 /**
@@ -5228,12 +5211,12 @@ TODO:
 	 * Group: Transform
 	 **/
 
-	static void gdImageClipRectangle(gdImagePtr im, gdRectPtr r)
+	private void gdImageClipRectangle(gdRectPtr r)
 	{
 		int c1x, c1y, c2x, c2y;
 		int x1,y1;
 
-		gdImageGetClip(im, &c1x, &c1y, &c2x, &c2y);
+		gdImageGetClip(&c1x, &c1y, &c2x, &c2y);
 		x1 = r->x + r->width - 1;
 		y1 = r->y + r->height - 1;
 		r->x = CLAMP(r->x, c1x, c2x);
@@ -5242,7 +5225,7 @@ TODO:
 		r->height = CLAMP(y1, c1y, c2y) - r->y + 1;
 	}
 
-	void gdDumpRect(const char *msg, gdRectPtr r)
+	void gdDumpRect(final char *msg, gdRectPtr r)
 	{
 		printf("%s (%i, %i) (%i, %i)\n", msg, r->x, r->y, r->width, r->height);
 	}
@@ -5263,17 +5246,17 @@ TODO:
 	 * Returns:
 	 *  GD_TRUE if the affine is rectilinear or GD_FALSE
 	 */
-	BGD_DECLARE(int) gdTransformAffineGetImage(gdImagePtr *dst,
-			const gdImagePtr src,
-	gdRectPtr src_area,
-	const double affine[6])
+	public int gdTransformAffineGetImage(GdImage dst,
+			final GdImage src,
+	GdRect src_area,
+	final double affine[6])
 	{
 		int res;
-		double m[6];
-		gdRect bbox;
-		gdRect area_full;
+		double[] m = new double[6];
+		GdRect bbox;
+		GdRect area_full;
 
-		if (src_area == NULL) {
+		if (src_area == null) {
 			area_full.x = 0;
 			area_full.y = 0;
 			area_full.width  = gdImageSX(src);
@@ -5284,13 +5267,13 @@ TODO:
 		gdTransformAffineBoundingBox(src_area, affine, &bbox);
 
 		*dst = gdImageCreateTrueColor(bbox.width, bbox.height);
-		if (*dst == NULL) {
+		if (*dst == null) {
 		return GD_FALSE;
 	}
 		(*dst)->saveAlphaFlag = 1;
 
-		if (!src->trueColor) {
-			gdImagePaletteToTrueColor(src);
+		if (!src.trueColor) {
+			src.paletteToTrueColor();
 		}
 
 	/* Translate to dst origin (0,0) */
@@ -5307,7 +5290,7 @@ TODO:
 
 		if (res != GD_TRUE) {
 			gdImageDestroy(*dst);
-			dst = NULL;
+			dst = null;
 			return GD_FALSE;
 		} else {
 			return GD_TRUE;
@@ -5329,16 +5312,16 @@ TODO:
 	 * Returns:
 	 *  GD_TRUE if the affine is rectilinear or GD_FALSE
 	 */
-	BGD_DECLARE(int) gdTransformAffineCopy(gdImagePtr dst,
+	BGD_DECLARE(int) gdTransformAffineCopy(GdImage dst,
 	int dst_x, int dst_y,
-	const gdImagePtr src,
+	final GdImage src,
 	gdRectPtr src_region,
-	const double affine[6])
+	final double affine[6])
 	{
 		int c1x,c1y,c2x,c2y;
 		int backclip = 0;
 		int backup_clipx1, backup_clipy1, backup_clipx2, backup_clipy2;
-		register int x, y, src_offset_x, src_offset_y;
+		int x, y, src_offset_x, src_offset_y;
 		double inv[6];
 		int *dst_p;
 		gdPointF pt, src_pt;
@@ -5380,8 +5363,8 @@ TODO:
 
 		gdImageGetClip(dst, &c1x, &c1y, &c2x, &c2y);
 
-		end_x = bbox.width  + (int) fabs(bbox.x);
-		end_y = bbox.height + (int) fabs(bbox.y);
+		end_x = bbox.width  + (int) abs(bbox.x);
+		end_y = bbox.height + (int) abs(bbox.y);
 
 	/* Get inverse affine to let us work with destination -> source */
 		gdAffineInvert(inv, affine);
@@ -5441,7 +5424,7 @@ TODO:
 	 * Returns:
 	 *  GD_TRUE if the affine is rectilinear or GD_FALSE
 	 */
-	BGD_DECLARE(int) gdTransformAffineBoundingBox(gdRectPtr src, const double affine[6], gdRectPtr bbox)
+	BGD_DECLARE(int) gdTransformAffineBoundingBox(gdRectPtr src, final double affine[6], gdRectPtr bbox)
 	{
 		gdPointF extent[4], min, max, point;
 		int i;
@@ -5481,81 +5464,76 @@ TODO:
 		return GD_TRUE;
 	}
 
-	BGD_DECLARE(int) gdImageSetInterpolationMethod(gdImagePtr im, gdInterpolationMethod id)
-	{
-		if (im == NULL || id < 0 || id > GD_METHOD_COUNT) {
-			return 0;
-		}
-
+	public int gdImageSetInterpolationMethod(GdInterpolationMethod id) {
 		switch (id) {
 			case GD_DEFAULT:
-				id = GD_BILINEAR_FIXED;
+				id = GdInterpolationMethod.GD_BILINEAR_FIXED;
 		/* Optimized versions */
 			case GD_BILINEAR_FIXED:
 			case GD_BICUBIC_FIXED:
 			case GD_NEAREST_NEIGHBOUR:
 			case GD_WEIGHTED4:
-				im->interpolation = NULL;
+				this.interpolation = null;
 				break;
 
 		/* generic versions*/
 			case GD_BELL:
-				im->interpolation = filter_bell;
+				this.interpolation = filter_bell;
 				break;
 			case GD_BESSEL:
-				im->interpolation = filter_bessel;
+				this.interpolation = filter_bessel;
 				break;
 			case GD_BICUBIC:
-				im->interpolation = filter_bicubic;
+				this.interpolation = filter_bicubic;
 				break;
 			case GD_BLACKMAN:
-				im->interpolation = filter_blackman;
+				this.interpolation = filter_blackman;
 				break;
 			case GD_BOX:
-				im->interpolation = filter_box;
+				this.interpolation = filter_box;
 				break;
 			case GD_BSPLINE:
-				im->interpolation = filter_bspline;
+				this.interpolation = filter_bspline;
 				break;
 			case GD_CATMULLROM:
-				im->interpolation = filter_catmullrom;
+				this.interpolation = filter_catmullrom;
 				break;
 			case GD_GAUSSIAN:
-				im->interpolation = filter_gaussian;
+				this.interpolation = filter_gaussian;
 				break;
 			case GD_GENERALIZED_CUBIC:
-				im->interpolation = filter_generalized_cubic;
+				this.interpolation = filter_generalized_cubic;
 				break;
 			case GD_HERMITE:
-				im->interpolation = filter_hermite;
+				this.interpolation = filter_hermite;
 				break;
 			case GD_HAMMING:
-				im->interpolation = filter_hamming;
+				this.interpolation = filter_hamming;
 				break;
 			case GD_HANNING:
-				im->interpolation = filter_hanning;
+				this.interpolation = filter_hanning;
 				break;
 			case GD_MITCHELL:
-				im->interpolation = filter_mitchell;
+				this.interpolation = filter_mitchell;
 				break;
 			case GD_POWER:
-				im->interpolation = filter_power;
+				this.interpolation = filter_power;
 				break;
 			case GD_QUADRATIC:
-				im->interpolation = filter_quadratic;
+				this.interpolation = filter_quadratic;
 				break;
 			case GD_SINC:
-				im->interpolation = filter_sinc;
+				this.interpolation = filter_sinc;
 				break;
 			case GD_TRIANGLE:
-				im->interpolation = filter_triangle;
+				this.interpolation = filter_triangle;
 				break;
 
 			default:
 				return 0;
 			break;
 		}
-		im->interpolation_id = id;
+		this.interpolation_id = id;
 		return 1;
 	}
 
@@ -5563,20 +5541,18 @@ TODO:
 	/* Return the interpolation mode set in 'im'.  This is here so that
 	 * the value can be read via a language or VM with an FFI but no
 	 * (portable) way to extract the value from the struct. */
-	BGD_DECLARE(gdInterpolationMethod) gdImageGetInterpolationMethod(gdImagePtr im)
-	{
-		return im->interpolation_id;
+	public GdInterpolationMethod getInterpolationMethod() {
+		return this.interpolation_id;
 	}
 
 	/* Convert a double to an unsigned char, rounding to the nearest
 	 * integer and clamping the result between 0 and max.  The absolute
 	 * value of clr must be less than the maximum value of an unsigned
 	 * short. */
-	static inline unsigned char
-						   uchar_clamp(double clr, unsigned char max) {
-		unsigned short result;
+	private static int uchar_clamp(final double clr, final int max) {
+		int result;
 
-		//assert(fabs(clr) <= SHRT_MAX);
+		//assert(abs(clr) <= SHRT_MAX);
 
 	/* Casting a negative float to an unsigned short is undefined.
 	 * However, casting a float to a signed truncates toward zero and
@@ -5586,7 +5562,7 @@ TODO:
 	 * for clr will be greater than 255. */
 
 	/* Convert and clamp. */
-		result = (unsigned short)(short)(clr + 0.5);
+		result = (short)(clr + 0.5);
 		if (result > max) {
 			result = (clr < 0) ? 0 : max;
 		}/* if */
@@ -5598,8 +5574,8 @@ TODO:
  * Rotate function Added on 2003/12
  * by Pierre-Alain Joye (pierre@php.net)
  **/
-	#define ROTATE_DEG2RAD  3.1415926535897932384626433832795/180
-	void gdImageSkewX (gdImagePtr dst, gdImagePtr src, int uRow, int iOffset, double dWeight, int clrBack, int ignoretransparent)
+	private static final double ROTATE_DEG2RAD = PI/180;
+	void gdImageSkewX (GdImage dst, GdImage src, int uRow, int iOffset, double dWeight, int clrBack, int ignoretransparent)
 	{
 		int i, r, g, b, a, clrBackR, clrBackG, clrBackB, clrBackA;
 		FuncPtr f;
@@ -5616,7 +5592,7 @@ TODO:
 			clrBackG = gdImageGreen(src, clrBack);
 			clrBackB = gdImageBlue(src, clrBack);
 			clrBackA = gdImageAlpha(src, clrBack);
-			clrBack =  gdTrueColorAlpha(clrBackR, clrBackG, clrBackB, clrBackA);
+			clrBack =  GdUtils.trueColorMixAlpha(clrBackR, clrBackG, clrBackB, clrBackA);
 			f = gdImageGetPixel;
 		}
 
@@ -5695,7 +5671,7 @@ TODO:
 		}
 	}
 
-	void gdImageSkewY (gdImagePtr dst, gdImagePtr src, int uCol, int iOffset, double dWeight, int clrBack, int ignoretransparent)
+	void gdImageSkewY (GdImage dst, GdImage src, int uCol, int iOffset, double dWeight, int clrBack, int ignoretransparent)
 	{
 		int i, iYPos=0, r, g, b, a;
 		FuncPtr f;
@@ -5782,11 +5758,11 @@ TODO:
 	}
 
 	/* Rotates an image by 90 degrees (counter clockwise) */
-	gdImagePtr gdImageRotate90 (gdImagePtr src, int ignoretransparent)
+	GdImage gdImageRotate90 (GdImage src, int ignoretransparent)
 	{
 		int uY, uX;
 		int c,r,g,b,a;
-		gdImagePtr dst;
+		GdImage dst;
 		FuncPtr f;
 
 		if (src->trueColor) {
@@ -5795,7 +5771,7 @@ TODO:
 			f = gdImageGetPixel;
 		}
 		dst = gdImageCreateTrueColor(src->sy, src->sx);
-		if (dst != NULL) {
+		if (dst != null) {
 			int old_blendmode = dst->alphaBlendingFlag;
 			dst->alphaBlendingFlag = 0;
 
@@ -5811,7 +5787,7 @@ TODO:
 						g = gdImageGreen(src,c);
 						b = gdImageBlue(src,c);
 						a = gdImageAlpha(src,c);
-						c = gdTrueColorAlpha(r, g, b, a);
+						c = GdUtils.trueColorMixAlpha(r, g, b, a);
 					}
 					if (ignoretransparent && c == dst->transparent) {
 						gdImageSetPixel(dst, uY, (dst->sy - uX - 1), dst->transparent);
@@ -5827,11 +5803,11 @@ TODO:
 	}
 
 	/* Rotates an image by 180 degrees (counter clockwise) */
-	gdImagePtr gdImageRotate180 (gdImagePtr src, int ignoretransparent)
+	GdImage gdImageRotate180 (GdImage src, int ignoretransparent)
 	{
 		int uY, uX;
 		int c,r,g,b,a;
-		gdImagePtr dst;
+		GdImage dst;
 		FuncPtr f;
 
 		if (src->trueColor) {
@@ -5841,7 +5817,7 @@ TODO:
 		}
 		dst = gdImageCreateTrueColor(src->sx, src->sy);
 
-		if (dst != NULL) {
+		if (dst != null) {
 			int old_blendmode = dst->alphaBlendingFlag;
 			dst->alphaBlendingFlag = 0;
 
@@ -5857,7 +5833,7 @@ TODO:
 						g = gdImageGreen(src,c);
 						b = gdImageBlue(src,c);
 						a = gdImageAlpha(src,c);
-						c = gdTrueColorAlpha(r, g, b, a);
+						c = GdUtils.trueColorMixAlpha(r, g, b, a);
 					}
 
 					if (ignoretransparent && c == dst->transparent) {
@@ -5874,11 +5850,11 @@ TODO:
 	}
 
 	/* Rotates an image by 270 degrees (counter clockwise) */
-	gdImagePtr gdImageRotate270 (gdImagePtr src, int ignoretransparent)
+	GdImage gdImageRotate270 (GdImage src, int ignoretransparent)
 	{
 		int uY, uX;
 		int c,r,g,b,a;
-		gdImagePtr dst;
+		GdImage dst;
 		FuncPtr f;
 
 		if (src->trueColor) {
@@ -5888,7 +5864,7 @@ TODO:
 		}
 		dst = gdImageCreateTrueColor (src->sy, src->sx);
 
-		if (dst != NULL) {
+		if (dst != null) {
 			int old_blendmode = dst->alphaBlendingFlag;
 			dst->alphaBlendingFlag = 0;
 
@@ -5904,7 +5880,7 @@ TODO:
 						g = gdImageGreen(src,c);
 						b = gdImageBlue(src,c);
 						a = gdImageAlpha(src,c);
-						c = gdTrueColorAlpha(r, g, b, a);
+						c = GdUtils.trueColorMixAlpha(r, g, b, a);
 					}
 
 					if (ignoretransparent && c == dst->transparent) {
@@ -5920,9 +5896,9 @@ TODO:
 		return dst;
 	}
 
-	gdImagePtr gdImageRotate45 (gdImagePtr src, double dAngle, int clrBack, int ignoretransparent)
+	GdImage gdImageRotate45 (GdImage src, double dAngle, int clrBack, int ignoretransparent)
 	{
-		gdImagePtr dst1,dst2,dst3;
+		GdImage dst1,dst2,dst3;
 		double dRadAngle, dSinE, dTan, dShear;
 		double dOffset;     /* Variable skew offset */
 		int u, iShear, newx, newy;
@@ -5933,14 +5909,14 @@ TODO:
 		dSinE = sin (dRadAngle);
 		dTan = tan (dRadAngle / 2.0);
 
-		newx = (int)(src->sx + src->sy * fabs(dTan));
+		newx = (int)(src->sx + src->sy * abs(dTan));
 		newy = src->sy;
 
 	/* 1st shear */
 		dst1 = gdImageCreateTrueColor(newx, newy);
 		/******* Perform 1st shear (horizontal) ******/
-		if (dst1 == NULL) {
-			return NULL;
+		if (dst1 == null) {
+			return null;
 		}
 		#ifdef HAVE_GD_BUNDLED
 		dst1->alphaBlendingFlag = gdEffectReplace;
@@ -5960,7 +5936,7 @@ TODO:
 				dst1->transparent = src->transparent;
 			} else {
 
-				dst1->transparent = gdTrueColorAlpha(gdImageRed(src, src->transparent), gdImageBlue(src, src->transparent), gdImageGreen(src, src->transparent), 127);
+				dst1->transparent = GdUtils.trueColorMixAlpha(gdImageRed(src, src -> transparent), gdImageBlue(src, src -> transparent), gdImageGreen(src, src -> transparent), 127);
 			}
 		}
 
@@ -5984,7 +5960,7 @@ TODO:
 			clrBackG = gdImageGreen(src, clrBack);
 			clrBackB = gdImageBlue(src, clrBack);
 			clrBackA = gdImageAlpha(src, clrBack);
-			clrBack =  gdTrueColorAlpha(clrBackR, clrBackG, clrBackB, clrBackA);
+			clrBack =  GdUtils.trueColorMixAlpha(clrBackR, clrBackG, clrBackB, clrBackA);
 		}
 	/* 2nd shear */
 		newx = dst1->sx;
@@ -5995,12 +5971,12 @@ TODO:
 			dOffset = -dSinE *  (src->sx - newx);
 		}
 
-		newy = (int) ((double) src->sx * fabs( dSinE ) + (double) src->sy * cos (dRadAngle))+1;
+		newy = (int) ((double) src->sx * abs(dSinE) + (double) src->sy * cos (dRadAngle))+1;
 
 		dst2 = gdImageCreateTrueColor(newx, newy);
-		if (dst2 == NULL) {
+		if (dst2 == null) {
 			gdImageDestroy(dst1);
-			return NULL;
+			return null;
 		}
 
 		#ifdef HAVE_GD_BUNDLED
@@ -6021,13 +5997,13 @@ TODO:
 	/* 3rd shear */
 		gdImageDestroy(dst1);
 
-		newx = (int) ((double)src->sy * fabs (dSinE) + (double)src->sx * cos (dRadAngle)) + 1;
+		newx = (int) ((double)src->sy * abs(dSinE) + (double)src->sx * cos (dRadAngle)) + 1;
 		newy = dst2->sy;
 
 		dst3 = gdImageCreateTrueColor(newx, newy);
-		if (dst3 == NULL) {
+		if (dst3 == null) {
 			gdImageDestroy(dst2);
-			return NULL;
+			return null;
 		}
 
 		#ifdef HAVE_GD_BUNDLED
@@ -6056,17 +6032,17 @@ TODO:
 		return dst3;
 	}
 
-	gdImagePtr gdImageRotate (gdImagePtr src, double dAngle, int clrBack, int ignoretransparent)
+	GdImage gdImageRotate (GdImage src, double dAngle, int clrBack, int ignoretransparent)
 	{
-		gdImagePtr pMidImg;
-		gdImagePtr rotatedImg;
+		GdImage pMidImg;
+		GdImage rotatedImg;
 
-		if (src == NULL) {
-			return NULL;
+		if (src == null) {
+			return null;
 		}
 
 		if (!gdImageTrueColor(src) && (clrBack < 0 || clrBack>=gdImageColorsTotal(src))) {
-			return NULL;
+			return null;
 		}
 
 		while (dAngle >= 360.0) {
@@ -6100,18 +6076,14 @@ TODO:
 			return gdImageRotate45 (src, dAngle, clrBack, ignoretransparent);
 		}
 
-		if (pMidImg == NULL) {
-			return NULL;
+		if (pMidImg == null) {
+			return null;
 		}
 
 		rotatedImg = gdImageRotate45 (pMidImg, dAngle, clrBack, ignoretransparent);
-		gdImageDestroy(pMidImg);
 
 		return rotatedImg;
 	}
 /* End Rotate function */
-
-
-
 
 }
