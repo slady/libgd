@@ -2852,6 +2852,14 @@ public class GdImage {
 		return ((a)<(b)?(MAX(b,c)):(MAX(a,c)));
 	}
 
+	private static int MIN(final int a, final int b) {
+		return ((a)<(b)?(a):(b));
+	}
+
+	private static int MAX(final int a, final int b) {
+		return ((a)<(b)?(b):(a));
+	}
+
 
 	/*
 	 * Theoretically, hue 0 (pure red) is identical to hue 6 in these transforms. Pure
@@ -3217,39 +3225,42 @@ TODO:
 
 			if (y < this.cy1) {
 				border = this.tpixels[0][this.cx1];
-				goto processborder;
+				return getPixelOverflowTCProcessBorder(border);
 			}
 
 			if (y < this.cy1) {
 				border = this.tpixels[0][this.cx1];
-				goto processborder;
+				return getPixelOverflowTCProcessBorder(border);
 			}
 
 			if (y > this.cy2) {
 				if (x >= this.cx1 && x <= this.cx1) {
 					border = this.tpixels[this.cy2][x];
-					goto processborder;
+					return getPixelOverflowTCProcessBorder(border);
 				} else {
-					return gdTrueColorAlpha(0, 0, 0, 127);
+					return GdUtils.trueColorMixAlpha(0, 0, 0, 127);
 				}
 			}
 
 		/* y is bound safe at this point */
 			if (x < this.cx1) {
 				border = this.tpixels[y][this.cx1];
-				goto processborder;
+				return getPixelOverflowTCProcessBorder(border);
 			}
 
 			if (x > this.cx2) {
 				border = this.tpixels[y][this.cx2];
 			}
 
-			processborder:
-			if (border == this.transparent) {
-				return GdUtils.trueColorMixAlpha(0, 0, 0, 127);
-			} else{
-				return GdUtils.trueColorMixAlpha(GdUtils.trueColorGetRed(border), GdUtils.trueColorGetGreen(border), GdUtils.trueColorGetBlue(border), 127);
-			}
+			return getPixelOverflowTCProcessBorder(border);
+		}
+	}
+
+	private int getPixelOverflowTCProcessBorder(final int border) {
+		if (border == this.transparent) {
+			return GdUtils.trueColorMixAlpha(0, 0, 0, 127);
+		} else{
+			return GdUtils.trueColorMixAlpha(GdUtils.trueColorGetRed(border), GdUtils.trueColorGetGreen(border), GdUtils.trueColorGetBlue(border), 127);
 		}
 	}
 
@@ -3273,18 +3284,18 @@ TODO:
 			int border = 0;
 			if (y < this.cy1) {
 				border = getPixel(this.cx1, 0);
-				goto processborder;
+				return getPixelOverflowPaletteProcessBorder(border);
 			}
 
 			if (y < this.cy1) {
 				border = getPixel(this.cx1, 0);
-				goto processborder;
+				return getPixelOverflowPaletteProcessBorder(border);
 			}
 
 			if (y > this.cy2) {
 				if (x >= this.cx1 && x <= this.cx1) {
 					border = getPixel(x, this.cy2);
-					goto processborder;
+					return getPixelOverflowPaletteProcessBorder(border);
 				} else {
 					return GdUtils.trueColorMixAlpha(0, 0, 0, 127);
 				}
@@ -3293,19 +3304,22 @@ TODO:
 		/* y is bound safe at this point */
 			if (x < this.cx1) {
 				border = getPixel(this.cx1, y);
-				goto processborder;
+				return getPixelOverflowPaletteProcessBorder(border);
 			}
 
 			if (x > this.cx2) {
 				border = getPixel(this.cx2, y);
 			}
 
-			processborder:
-			if (border == this.transparent) {
-				return GdUtils.trueColorMixAlpha(0, 0, 0, 127);
-			} else{
-				return colorIndex2RGBcustomA(border, 127);
-			}
+			return getPixelOverflowPaletteProcessBorder(border);
+		}
+	}
+
+	private int getPixelOverflowPaletteProcessBorder(final int border) {
+		if (border == this.transparent) {
+			return GdUtils.trueColorMixAlpha(0, 0, 0, 127);
+		} else{
+			return colorIndex2RGBcustomA(border, 127);
 		}
 	}
 
@@ -3444,7 +3458,7 @@ TODO:
 		return GdUtils.trueColorMixAlpha(((int) new_r), ((int) new_g), ((int) new_b), ((int) new_a));
 	}
 
-	private LineContribType _gdContributionsCalc(int line_size, int src_size, double scale_d,  final GdInterpolation pFilter)
+	private LineContribType _gdContributionsCalc(int line_size, int src_size, double scale_d,  final GdFilterInterface pFilter)
 	{
 		double width_d;
 		double scale_f_d = 1.0;
