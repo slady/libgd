@@ -18,5 +18,5 @@ package info.miranda.gd;
  *  <gdImageCreate>, <gdImageCreateTrueColor>,
  **/
 public class GdPointF {
-	double x, y;
+	public double x, y;
 }

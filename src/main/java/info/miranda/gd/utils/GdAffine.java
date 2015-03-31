@@ -1,11 +1,14 @@
 package info.miranda.gd.utils;
 
+import info.miranda.gd.GdPointF;
+
 /**
  * Title: Matrix
  * Group: Affine Matrix
  */
-public class GdMatrix {
+public class GdAffine {
 
+	final double[] affine = new double[6];
 
 	/**
 	 * Function: gdAffineApplyToPointF
@@ -21,14 +24,13 @@ public class GdMatrix {
 	 * Returns:
 	 *  GD_TRUE if the affine is rectilinear or GD_FALSE
 	 */
-	public int gdAffineApplyToPointF (gdPointFPtr dst, final gdPointFPtr src,
-	final double affine[6])
-	{
-		double x = src->x;
-		double y = src->y;
-		dst->x = x * affine[0] + y * affine[2] + affine[4];
-		dst->y = x * affine[1] + y * affine[3] + affine[5];
-		return GD_TRUE;
+	public GdPointF applyToPointF(final GdPointF src) {
+		final GdPointF dst = new GdPointF();
+		double x = src.x;
+		double y = src.y;
+		dst.x = x * affine[0] + y * affine[2] + affine[4];
+		dst.y = x * affine[1] + y * affine[3] + affine[5];
+		return dst;
 	}
 
 	/**
@@ -52,22 +54,21 @@ public class GdMatrix {
 	 * Returns:
 	 *  GD_TRUE if the affine is rectilinear or GD_FALSE
 	 */
-	public int gdAffineInvert (double dst[6], final double src[6])
-	{
-		double r_det = (src[0] * src[3] - src[1] * src[2]);
+	public boolean invert(final GdAffine dst) {
+		double r_det = (this.affine[0] * this.affine[3] - this.affine[1] * this.affine[2]);
 
 		if (r_det <= 0.0) {
-			return GD_FALSE;
+			return false;
 		}
 
 		r_det = 1.0 / r_det;
-		dst[0] = src[3] * r_det;
-		dst[1] = -src[1] * r_det;
-		dst[2] = -src[2] * r_det;
-		dst[3] = src[0] * r_det;
-		dst[4] = -src[4] * dst[0] - src[5] * dst[2];
-		dst[5] = -src[4] * dst[1] - src[5] * dst[3];
-		return GD_TRUE;
+		dst.affine[0] = this.affine[3] * r_det;
+		dst.affine[1] = -this.affine[1] * r_det;
+		dst.affine[2] = -this.affine[2] * r_det;
+		dst.affine[3] = this.affine[0] * r_det;
+		dst.affine[4] = -this.affine[4] * dst.affine[0] - this.affine[5] * dst.affine[2];
+		dst.affine[5] = -this.affine[4] * dst.affine[1] - this.affine[5] * dst.affine[3];
+		return true;
 	}
 
 	/**
@@ -87,15 +88,13 @@ public class GdMatrix {
 	 * Returns:
 	 *  GD_TRUE on success or GD_FALSE
 	 */
-	public int gdAffineFlip (double dst[6], final double src[6], final int flip_h, final int flip_v)
-	{
-		dst[0] = flip_h ? - src[0] : src[0];
-		dst[1] = flip_h ? - src[1] : src[1];
-		dst[2] = flip_v ? - src[2] : src[2];
-		dst[3] = flip_v ? - src[3] : src[3];
-		dst[4] = flip_h ? - src[4] : src[4];
-		dst[5] = flip_v ? - src[5] : src[5];
-		return GD_TRUE;
+	public void flip(final GdAffine dst, final boolean flip_h, final boolean flip_v) {
+		dst.affine[0] = flip_h ? - this.affine[0] : this.affine[0];
+		dst.affine[1] = flip_h ? - this.affine[1] : this.affine[1];
+		dst.affine[2] = flip_v ? - this.affine[2] : this.affine[2];
+		dst.affine[3] = flip_v ? - this.affine[3] : this.affine[3];
+		dst.affine[4] = flip_h ? - this.affine[4] : this.affine[4];
+		dst.affine[5] = flip_v ? - this.affine[5] : this.affine[5];
 	}
 
 	/**
@@ -115,23 +114,21 @@ public class GdMatrix {
 	 * Returns:
 	 *  GD_TRUE on success or GD_FALSE
 	 */
-	public int gdAffineConcat (double dst[6], final double m1[6], final double m2[6])
-	{
-		double dst0, dst1, dst2, dst3, dst4, dst5;
+	public GdAffine concat(final GdAffine m1, final GdAffine m2) {
+		final double dst0, dst1, dst2, dst3, dst4, dst5;
 
-		dst0 = m1[0] * m2[0] + m1[1] * m2[2];
-		dst1 = m1[0] * m2[1] + m1[1] * m2[3];
-		dst2 = m1[2] * m2[0] + m1[3] * m2[2];
-		dst3 = m1[2] * m2[1] + m1[3] * m2[3];
-		dst4 = m1[4] * m2[0] + m1[5] * m2[2] + m2[4];
-		dst5 = m1[4] * m2[1] + m1[5] * m2[3] + m2[5];
-		dst[0] = dst0;
-		dst[1] = dst1;
-		dst[2] = dst2;
-		dst[3] = dst3;
-		dst[4] = dst4;
-		dst[5] = dst5;
-		return GD_TRUE;
+		dst0 = m1.affine[0] * m2.affine[0] + m1.affine[1] * m2.affine[2];
+		dst1 = m1.affine[0] * m2.affine[1] + m1.affine[1] * m2.affine[3];
+		dst2 = m1.affine[2] * m2.affine[0] + m1.affine[3] * m2.affine[2];
+		dst3 = m1.affine[2] * m2.affine[1] + m1.affine[3] * m2.affine[3];
+		dst4 = m1.affine[4] * m2.affine[0] + m1.affine[5] * m2.affine[2] + m2.affine[4];
+		dst5 = m1.affine[4] * m2.affine[1] + m1.affine[5] * m2.affine[3] + m2.affine[5];
+		dst.affine[0] = dst0;
+		dst.affine[1] = dst1;
+		dst.affine[2] = dst2;
+		dst.affine[3] = dst3;
+		dst.affine[4] = dst4;
+		dst.affine[5] = dst5;
 	}
 
 	/**
@@ -283,9 +280,9 @@ public class GdMatrix {
 	 *
 	 *  GD_TRUE on success or GD_FALSE
 	 **/
-	public double gdAffineExpansion (final double src[6])
+	public double gdAffineExpansion ()
 	{
-		return sqrt (fabs (src[0] * src[3] - src[1] * src[2]));
+		return sqrt (fabs (this.affine[0] * this.affine[3] - this.affine[1] * this.affine[2]));
 	}
 
 	/**
@@ -317,14 +314,13 @@ public class GdMatrix {
 	 * Returns:
 	 * 	GD_TRUE on success or GD_FALSE
 	 */
-	public int gdAffineEqual (final double m1[6], final double m2[6])
-	{
-		return (fabs (m1[0] - m2[0]) < GD_EPSILON &&
-				fabs (m1[1] - m2[1]) < GD_EPSILON &&
-				fabs (m1[2] - m2[2]) < GD_EPSILON &&
-				fabs (m1[3] - m2[3]) < GD_EPSILON &&
-				fabs (m1[4] - m2[4]) < GD_EPSILON &&
-				fabs (m1[5] - m2[5]) < GD_EPSILON);
+	public boolean equal(final GdAffine m1, final GdAffine m2) {
+		return (fabs (m1.affine[0] - m2.affine[0]) < GD_EPSILON &&
+				fabs (m1.affine[1] - m2.affine[1]) < GD_EPSILON &&
+				fabs (m1.affine[2] - m2.affine[2]) < GD_EPSILON &&
+				fabs (m1.affine[3] - m2.affine[3]) < GD_EPSILON &&
+				fabs (m1.affine[4] - m2.affine[4]) < GD_EPSILON &&
+				fabs (m1.affine[5] - m2.affine[5]) < GD_EPSILON);
 	}
 
 
