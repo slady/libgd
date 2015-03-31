@@ -3458,8 +3458,7 @@ TODO:
 		return GdUtils.trueColorMixAlpha(((int) new_r), ((int) new_g), ((int) new_b), ((int) new_a));
 	}
 
-	private LineContribType _gdContributionsCalc(int line_size, int src_size, double scale_d,  final GdFilterInterface pFilter)
-	{
+	private LineContribType _gdContributionsCalc(int line_size, int src_size, double scale_d,  final GdFilterInterface filter) {
 		double width_d;
 		double scale_f_d = 1.0;
 		final double filter_width_d = DEFAULT_BOX_RADIUS;
@@ -3497,7 +3496,7 @@ TODO:
 			res.ContribRow[u].Right = iRight;
 
 			for (iSrc = iLeft; iSrc <= iRight; iSrc++) {
-				dTotalWeight += (res.ContribRow[u].Weights[iSrc-iLeft] =  scale_f_d * (*pFilter)(scale_f_d * (dCenter - (double)iSrc)));
+				dTotalWeight += (res.ContribRow[u].Weights[iSrc-iLeft] =  scale_f_d * filter.filter(scale_f_d * (dCenter - (double) iSrc)));
 			}
 
 			if (dTotalWeight < 0.0) {
@@ -3584,53 +3583,43 @@ TODO:
 	}/* _gdScalePass*/
 
 
-	private GdImage
-	gdImageScaleTwoPass(final GdImage src, final int new_width,
-						final int new_height)
-	{
-		final int src_width = src.sx;
-		final int src_height = src.sy;
+	private GdImage scaleTwoPass(final int new_width, final int new_height) {
+		final int src_width = sx;
+		final int src_height = sy;
 		GdImage tmp_im = null;
 		GdImage dst = null;
 
     /* First, handle the trivial case. */
 		if (src_width == new_width && src_height == new_height) {
-			return src.imageClone();
+			return imageClone();
 		}/* if */
 
 	/* Convert to truecolor if it isn't; this code requires it. */
-		if (!src.trueColor) {
-			src.paletteToTrueColor();
+		if (!trueColor) {
+			paletteToTrueColor();
 		}/* if */
 
     /* Scale horizontally unless sizes are the same. */
 		if (src_width == new_width) {
-			tmp_im = src;
+			tmp_im = this;
 		} else {
-			tmp_im = gdImageCreateTrueColor(new_width, src_height);
-			if (tmp_im == null) {
-				return null;
-			}
-			gdImageSetInterpolationMethod(tmp_im, src.interpolation_id);
+			tmp_im = new GdImage(new_width, src_height, GdImageColorType.TRUE_COLOR);
+			tmp_im.setInterpolationMethod(interpolation_id);
 
-			_gdScalePass(src, src_width, tmp_im, new_width, src_height, HORIZONTAL);
+			_gdScalePass(this, src_width, tmp_im, new_width, src_height, GdAxis.HORIZONTAL);
 		}/* if .. else*/
 
     /* If vertical sizes match, we're done. */
 		if (src_height == new_height) {
-			assert(tmp_im != src);
+			assert(tmp_im != this);
 			return tmp_im;
 		}/* if */
 
     /* Otherwise, we need to scale vertically. */
-		dst = gdImageCreateTrueColor(new_width, new_height);
+		dst = new GdImage(new_width, new_height, GdImageColorType.TRUE_COLOR);
 		if (dst != null) {
-			gdImageSetInterpolationMethod(dst, src->interpolation_id);
-			_gdScalePass(tmp_im, src_height, dst, new_height, new_width, VERTICAL);
-		}/* if */
-
-		if (src != tmp_im) {
-			gdFree(tmp_im);
+			dst.setInterpolationMethod(interpolation_id);
+			_gdScalePass(tmp_im, src_height, dst, new_height, new_width, GdAxis.VERTICAL);
 		}/* if */
 
 		return dst;
@@ -3647,22 +3636,20 @@ TODO:
 		pre scale very large images before using another interpolation
 		methods for the last step.
 	*/
-	private GdImage
-	gdImageScaleNearestNeighbour(final int width, final int height)
-	{
-		final long new_width = MAX(1, width);
-		final long new_height = MAX(1, height);
+	private GdImage gdImageScaleNearestNeighbour(final int width, final int height) {
+		final int new_width = MAX(1, width);
+		final int new_height = MAX(1, height);
 		final float dx = (float)this.sx / (float)new_width;
 		final float dy = (float)this.sy / (float)new_height;
 		final long f_dx = gd_ftofx(dx);
 		final long f_dy = gd_ftofx(dy);
 
 		GdImage dst_img;
-		long  dst_offset_x;
-		long  dst_offset_y = 0;
+		int dst_offset_x;
+		int dst_offset_y = 0;
 		int i;
 
-		dst_img = gdImageCreateTrueColor(new_width, new_height);
+		dst_img = new GdImage(new_width, new_height, GdImageColorType.TRUE_COLOR);
 
 		if (dst_img == null) {
 			return null;
@@ -3677,10 +3664,10 @@ TODO:
 					final long f_j = gd_itofx(j);
 					final long f_a = gd_mulfx(f_i, f_dy);
 					final long f_b = gd_mulfx(f_j, f_dx);
-					final long m = gd_fxtoi(f_a);
-					final long n = gd_fxtoi(f_b);
+					final int m = gd_fxtoi(f_a);
+					final int n = gd_fxtoi(f_b);
 
-					dst_img->tpixels[dst_offset_y][dst_offset_x++] = this.tpixels[m][n];
+					dst_img.tpixels[dst_offset_y][dst_offset_x++] = this.tpixels[m][n];
 				}
 			} else {
 				for (j=0; j<new_width; j++) {
@@ -3688,10 +3675,10 @@ TODO:
 					final long f_j = gd_itofx(j);
 					final long f_a = gd_mulfx(f_i, f_dy);
 					final long f_b = gd_mulfx(f_j, f_dx);
-					final long m = gd_fxtoi(f_a);
-					final long n = gd_fxtoi(f_b);
+					final int m = gd_fxtoi(f_a);
+					final int n = gd_fxtoi(f_b);
 
-					dst_img->tpixels[dst_offset_y][dst_offset_x++] = colorIndex2RGBA(this.pixels[m][n]);
+					dst_img.tpixels[dst_offset_y][dst_offset_x++] = colorIndex2RGBA(this.pixels[m][n]);
 				}
 			}
 			dst_offset_y++;
@@ -3699,8 +3686,7 @@ TODO:
 		return dst_img;
 	}
 
-	private int getPixelOverflowColorTC(final int x, final int y, final int color)
-	{
+	private int getPixelOverflowColorTC(final int x, final int y, final int color) {
 		if (isBoundsSafe(x, y)) {
 			final int c = this.tpixels[y][x];
 			if (c == this.transparent) {
@@ -3711,18 +3697,18 @@ TODO:
 			int border = 0;
 			if (y < this.cy1) {
 				border = this.tpixels[0][this.cx1];
-				goto processborder;
+				return getPixelOverflowColorTCProcessBorder(border);
 			}
 
 			if (y < this.cy1) {
 				border = this.tpixels[0][this.cx1];
-				goto processborder;
+				return getPixelOverflowColorTCProcessBorder(border);
 			}
 
 			if (y > this.cy2) {
 				if (x >= this.cx1 && x <= this.cx1) {
 					border = this.tpixels[this.cy2][x];
-					goto processborder;
+					return getPixelOverflowColorTCProcessBorder(border);
 				} else {
 					return GdUtils.trueColorMixAlpha(0, 0, 0, 127);
 				}
@@ -3731,58 +3717,58 @@ TODO:
 		/* y is bound safe at this point */
 			if (x < this.cx1) {
 				border = this.tpixels[y][this.cx1];
-				goto processborder;
+				return getPixelOverflowColorTCProcessBorder(border);
 			}
 
 			if (x > this.cx2) {
 				border = this.tpixels[y][this.cx2];
 			}
 
-			processborder:
-			if (border == this.transparent) {
-				return GdUtils.trueColorMixAlpha(0, 0, 0, 127);
-			} else{
-				return GdUtils.trueColorMixAlpha(GdUtils.trueColorGetRed(border), GdUtils.trueColorGetGreen(border), GdUtils.trueColorGetBlue(border), 127);
-			}
+			return getPixelOverflowColorTCProcessBorder(border);
 		}
 	}
 
-	private GdImage gdImageScaleBilinearPalette(final int new_width, final int new_height)
-	{
+	private int getPixelOverflowColorTCProcessBorder(final int border) {
+		if (border == this.transparent) {
+			return GdUtils.trueColorMixAlpha(0, 0, 0, 127);
+		} else{
+			return GdUtils.trueColorMixAlpha(GdUtils.trueColorGetRed(border), GdUtils.trueColorGetGreen(border), GdUtils.trueColorGetBlue(border), 127);
+		}
+	}
+
+	private GdImage gdImageScaleBilinearPalette(final int new_width, final int new_height) {
 		long _width = MAX(1, new_width);
 		long _height = MAX(1, new_height);
-		float dx = (float)gdImageSX(im) / (float)_width;
-		float dy = (float)gdImageSY(im) / (float)_height;
+		float dx = (float)sx / (float)_width;
+		float dy = (float)sy / (float)_height;
 		long f_dx = gd_ftofx(dx);
 		long f_dy = gd_ftofx(dy);
 		long f_1 = gd_itofx(1);
 
 		int dst_offset_h;
 		int dst_offset_v = 0;
-		long i;
 		GdImage new_img;
 		final int transparent = this.transparent;
 
-		new_img = gdImageCreateTrueColor(new_width, new_height);
+		new_img = new GdImage(new_width, new_height, GdImageColorType.TRUE_COLOR);
 		if (new_img == null) {
 			return null;
 		}
-		new_img->transparent = GdUtils.trueColorMixAlpha(this.red[transparent], this.green[transparent], this.blue[transparent], this.alpha[transparent]);
+		new_img.transparent = GdUtils.trueColorMixAlpha(this.red[transparent], this.green[transparent], this.blue[transparent], this.alpha[transparent]);
 
-		for (i=0; i < _height; i++) {
-			long j;
+		for (int i=0; i < _height; i++) {
 			final long f_i = gd_itofx(i);
 			final long f_a = gd_mulfx(f_i, f_dy);
-			long m = gd_fxtoi(f_a);
+			int m = gd_fxtoi(f_a);
 
 			dst_offset_h = 0;
 
-			for (j=0; j < _width; j++) {
+			for (int j=0; j < _width; j++) {
 			/* Update bitmap */
 				long f_j = gd_itofx(j);
 				long f_b = gd_mulfx(f_j, f_dx);
 
-				final long n = gd_fxtoi(f_b);
+				final int n = gd_fxtoi(f_b);
 				long f_f = f_a - gd_itofx(m);
 				long f_g = f_b - gd_itofx(n);
 
@@ -3828,7 +3814,7 @@ TODO:
 					final char blue = (char) gd_fxtoi(gd_mulfx(f_w1, f_b1) + gd_mulfx(f_w2, f_b2) + gd_mulfx(f_w3, f_b3) + gd_mulfx(f_w4, f_b4));
 					final char alpha = (char) gd_fxtoi(gd_mulfx(f_w1, f_a1) + gd_mulfx(f_w2, f_a2) + gd_mulfx(f_w3, f_a3) + gd_mulfx(f_w4, f_a4));
 
-					new_img->tpixels[dst_offset_v][dst_offset_h] = GdUtils.trueColorMixAlpha(red, green, blue, alpha);
+					new_img.tpixels[dst_offset_v][dst_offset_h] = GdUtils.trueColorMixAlpha(red, green, blue, alpha);
 				}
 
 				dst_offset_h++;
@@ -3839,37 +3825,29 @@ TODO:
 		return new_img;
 	}
 
-	private GdImage gdImageScaleBilinearTC(final int new_width, final int new_height)
-	{
+	private GdImage gdImageScaleBilinearTC(final int new_width, final int new_height) {
 		long dst_w = MAX(1, new_width);
 		long dst_h = MAX(1, new_height);
-		float dx = (float)gdImageSX(im) / (float)dst_w;
-		float dy = (float)gdImageSY(im) / (float)dst_h;
+		float dx = (float)sx / (float)dst_w;
+		float dy = (float)sy / (float)dst_h;
 		long f_dx = gd_ftofx(dx);
 		long f_dy = gd_ftofx(dy);
 		long f_1 = gd_itofx(1);
 
 		int dst_offset_h;
 		int dst_offset_v = 0;
-		long i;
-		GdImage new_img;
+		final GdImage new_img = new GdImage(new_width, new_height, GdImageColorType.TRUE_COLOR);
 
-		new_img = gdImageCreateTrueColor(new_width, new_height);
-		if (!new_img){
-			return null;
-		}
-
-		for (i=0; i < dst_h; i++) {
-			long j;
+		for (int i=0; i < dst_h; i++) {
 			dst_offset_h = 0;
-			for (j=0; j < dst_w; j++) {
+			for (int j=0; j < dst_w; j++) {
 			/* Update bitmap */
 				long f_i = gd_itofx(i);
 				long f_j = gd_itofx(j);
 				long f_a = gd_mulfx(f_i, f_dy);
 				long f_b = gd_mulfx(f_j, f_dx);
-				final long m = gd_fxtoi(f_a);
-				final long n = gd_fxtoi(f_b);
+				final int m = gd_fxtoi(f_a);
+				final int n = gd_fxtoi(f_b);
 				long f_f = f_a - gd_itofx(m);
 				long f_g = f_b - gd_itofx(n);
 
@@ -3913,7 +3891,7 @@ TODO:
 					final char blue  = (char) gd_fxtoi(gd_mulfx(f_w1, f_b1) + gd_mulfx(f_w2, f_b2) + gd_mulfx(f_w3, f_b3) + gd_mulfx(f_w4, f_b4));
 					final char alpha = (char) gd_fxtoi(gd_mulfx(f_w1, f_a1) + gd_mulfx(f_w2, f_a2) + gd_mulfx(f_w3, f_a3) + gd_mulfx(f_w4, f_a4));
 
-					new_img->tpixels[dst_offset_v][dst_offset_h] = GdUtils.trueColorMixAlpha(red, green, blue, alpha);
+					new_img.tpixels[dst_offset_v][dst_offset_h] = GdUtils.trueColorMixAlpha(red, green, blue, alpha);
 				}
 
 				dst_offset_h++;
@@ -3924,10 +3902,7 @@ TODO:
 		return new_img;
 	}
 
-	private GdImage
-	gdImageScaleBilinear(final int new_width,
-						 final int new_height)
-	{
+	private GdImage gdImageScaleBilinear(final int new_width, final int new_height) {
 		if (this.trueColor) {
 			return gdImageScaleBilinearTC(new_width, new_height);
 		} else {
@@ -3935,57 +3910,48 @@ TODO:
 		}
 	}
 
-	private GdImage
-	gdImageScaleBicubicFixed(GdImage src, final int width,
-							 final int height)
-	{
-		final long new_width = MAX(1, width);
-		final long new_height = MAX(1, height);
-		final int src_w = gdImageSX(src);
-		final int src_h = gdImageSY(src);
+	private GdImage gdImageScaleBicubicFixed(final int width, final int height) {
+		final int new_width = MAX(1, width);
+		final int new_height = MAX(1, height);
+		final int src_w = sx;
+		final int src_h = sy;
 		final long f_dx = gd_ftofx((float)src_w / (float)new_width);
-		final long f_dy = gd_ftofx((float)src_h / (float)new_height);
+		final long f_dy = gd_ftofx((float) src_h / (float) new_height);
 		final long f_1 = gd_itofx(1);
 		final long f_2 = gd_itofx(2);
 		final long f_4 = gd_itofx(4);
 		final long f_6 = gd_itofx(6);
 		final long f_gamma = gd_ftofx(1.04f);
-		GdImage dst;
 
 		int dst_offset_x;
 		int dst_offset_y = 0;
-		long i;
 
 	/* impact perf a bit, but not that much. Implementation for palette
 	   images can be done at a later point.
 	*/
-		if (!src.trueColor) {
-			src.paletteToTrueColor();
+		if (!trueColor) {
+			paletteToTrueColor();
 		}
 
-		dst = gdImageCreateTrueColor(new_width, new_height);
-		if (!dst) {
-			return null;
-		}
+		final GdImage dst = new GdImage(new_width, new_height, GdImageColorType.TRUE_COLOR);
 
-		dst->saveAlphaFlag = 1;
+		dst.saveAlphaFlag = 1;
 
-		for (i=0; i < new_height; i++) {
-			long j;
+		for (int i=0; i < new_height; i++) {
 			dst_offset_x = 0;
 
-			for (j=0; j < new_width; j++) {
+			for (int j=0; j < new_width; j++) {
 				final long f_a = gd_mulfx(gd_itofx(i), f_dy);
 				final long f_b = gd_mulfx(gd_itofx(j), f_dx);
-				final long m = gd_fxtoi(f_a);
-				final long n = gd_fxtoi(f_b);
+				final int m = gd_fxtoi(f_a);
+				final int n = gd_fxtoi(f_b);
 				final long f_f = f_a - gd_itofx(m);
 				final long f_g = f_b - gd_itofx(n);
-				int src_offset_x[16], src_offset_y[16];
-				long k;
+				int[] src_offset_x = new int[16];
+				int[] src_offset_y = new int[16];
 				long f_red = 0, f_green = 0, f_blue = 0, f_alpha = 0;
 				char red, green, blue, alpha = 0;
-				int *dst_row = dst->tpixels[dst_offset_y];
+				int[] dst_row = dst.tpixels[dst_offset_y];
 
 				if ((m < 1) || (n < 1)) {
 					src_offset_x[0] = n;
@@ -4109,7 +4075,7 @@ TODO:
 					src_offset_y[15] = m;
 				}
 
-				for (k = -1; k < 3; k++) {
+				for (int k = -1; k < 3; k++) {
 					final long f = gd_itofx(k)-f_f;
 					final long f_fm1 = f - f_1;
 					final long f_fp1 = f + f_1;
@@ -4146,7 +4112,7 @@ TODO:
 						f_RX = gd_divfx((f_a-gd_mulfx(f_4,f_b)+gd_mulfx(f_6,f_c)-gd_mulfx(f_4,f_d)),f_6);
 						f_R = gd_mulfx(f_RY,f_RX);
 
-						c = src->tpixels[*(src_offset_y + _k)][*(src_offset_x + _k)];
+						c = tpixels[src_offset_y[_k]][src_offset_x[_k]];
 						f_rs = gd_itofx(GdUtils.trueColorGetRed(c));
 						f_gs = gd_itofx(GdUtils.trueColorGetGreen(c));
 						f_bs = gd_itofx(GdUtils.trueColorGetBlue(c));
@@ -4164,7 +4130,7 @@ TODO:
 				blue   = (char) CLAMP(gd_fxtoi(gd_mulfx(f_blue,  f_gamma)),  0, 255);
 				alpha  = (char) CLAMP(gd_fxtoi(gd_mulfx(f_alpha,  f_gamma)), 0, 127);
 
-				*(dst_row + dst_offset_x) = GdUtils.trueColorMixAlpha(red, green, blue, alpha);
+				dst_row[dst_offset_x] = GdUtils.trueColorMixAlpha(red, green, blue, alpha);
 
 				dst_offset_x++;
 			}
@@ -4173,72 +4139,64 @@ TODO:
 		return dst;
 	}
 
-	public GdImage gdImageScale(final GdImage src, final int new_width, final int new_height)
-	{
+	public GdImage scale(final int new_width, final int new_height) {
 		GdImage im_scaled = null;
 
-		if (src == null || src.interpolation_id < 0 || src.interpolation_id > GD_METHOD_COUNT) {
-			return 0;
+		if (src == null || interpolation_id == null) {
+			return null;
 		}
 
-		switch (src.interpolation_id) {
+		switch (interpolation_id) {
 		/*Special cases, optimized implementations */
 			case GD_NEAREST_NEIGHBOUR:
-				im_scaled = gdImageScaleNearestNeighbour(src, new_width, new_height);
+				im_scaled = gdImageScaleNearestNeighbour(new_width, new_height);
 				break;
 
 			case GD_BILINEAR_FIXED:
-				im_scaled = gdImageScaleBilinear(src, new_width, new_height);
+				im_scaled = gdImageScaleBilinear(new_width, new_height);
 				break;
 
 			case GD_BICUBIC_FIXED:
-				im_scaled = gdImageScaleBicubicFixed(src, new_width, new_height);
+				im_scaled = gdImageScaleBicubicFixed(new_width, new_height);
 				break;
 
 		/* generic */
 			default:
-				if (src.interpolation == null) {
+				if (interpolation == null) {
 					return null;
 				}
-				im_scaled = gdImageScaleTwoPass(src, new_width, new_height);
+				im_scaled = scaleTwoPass(new_width, new_height);
 				break;
 		}
 
 		return im_scaled;
 	}
 
-	private GdImage
-	gdImageRotateNearestNeighbour(GdImage src, final float degrees,
-								  final int bgColor)
-	{
+	private GdImage rotateNearestNeighbour(final float degrees, final int bgColor) {
 		float _angle = ((float) (-degrees / 180.0f) * (float)PI);
-		final int src_w  = gdImageSX(src);
-		final int src_h = gdImageSY(src);
+		final int src_w = sx;
+		final int src_h = sy;
 		final int new_width = (int)(abs((int)(src_w * cos(_angle))) + abs((int)(src_h * sin(_angle))) + 0.5f);
 		final int new_height = (int)(abs((int)(src_w * sin(_angle))) + abs((int)(src_h * cos(_angle))) + 0.5f);
 		final long f_0_5 = gd_ftofx(0.5f);
 		final long f_H = gd_itofx(src_h/2);
-		final long f_W = gd_itofx(src_w/2);
-		final long f_cos = gd_ftofx(cos(-_angle));
-		final long f_sin = gd_ftofx(sin(-_angle));
+		final long f_W = gd_itofx(src_w / 2);
+		final long f_cos = gd_dtofx(cos(-_angle));
+		final long f_sin = gd_dtofx(sin(-_angle));
 
 		int dst_offset_x;
 		int dst_offset_y = 0;
 		int i;
-		GdImage dst;
 
 	/* impact perf a bit, but not that much. Implementation for palette
 	   images can be done at a later point.
 	*/
-		if (!src.trueColor) {
-			src.paletteToTrueColor();
+		if (!trueColor) {
+			paletteToTrueColor();
 		}
 
-		dst = gdImageCreateTrueColor(new_width, new_height);
-		if (!dst) {
-			return null;
-		}
-		dst->saveAlphaFlag = 1;
+		final GdImage dst = new GdImage(new_width, new_height, GdImageColorType.TRUE_COLOR);
+		dst.saveAlphaFlag = 1;
 		for (i = 0; i < new_height; i++) {
 			int j;
 			dst_offset_x = 0;
@@ -4247,16 +4205,16 @@ TODO:
 				long f_j = gd_itofx((int)j - (int)new_width  / 2);
 				long f_m = gd_mulfx(f_j,f_sin) + gd_mulfx(f_i,f_cos) + f_0_5 + f_H;
 				long f_n = gd_mulfx(f_j,f_cos) - gd_mulfx(f_i,f_sin) + f_0_5 + f_W;
-				long m = gd_fxtoi(f_m);
-				long n = gd_fxtoi(f_n);
+				int m = gd_fxtoi(f_m);
+				int n = gd_fxtoi(f_n);
 
 				if ((m > 0) && (m < src_h-1) && (n > 0) && (n < src_w-1)) {
 					if (dst_offset_y < new_height) {
-						dst->tpixels[dst_offset_y][dst_offset_x++] = src->tpixels[m][n];
+						dst.tpixels[dst_offset_y][dst_offset_x++] = this.tpixels[m][n];
 					}
 				} else {
 					if (dst_offset_y < new_height) {
-						dst->tpixels[dst_offset_y][dst_offset_x++] = bgColor;
+						dst.tpixels[dst_offset_y][dst_offset_x++] = bgColor;
 					}
 				}
 			}
@@ -4265,19 +4223,17 @@ TODO:
 		return dst;
 	}
 
-	private GdImage
-	gdImageRotateGeneric(GdImage src, final float degrees, final int bgColor)
-	{
+	private GdImage rotateGeneric(final float degrees, final int bgColor) {
 		float _angle = ((float) (-degrees / 180.0f) * (float)PI);
-		final int src_w  = gdImageSX(src);
-		final int src_h = gdImageSY(src);
+		final int src_w  = sx;
+		final int src_h = sy;
 		final int new_width = (int)(abs((int)(src_w * cos(_angle))) + abs((int)(src_h * sin(_angle))) + 0.5f);
 		final int new_height = (int)(abs((int)(src_w * sin(_angle))) + abs((int)(src_h * cos(_angle))) + 0.5f);
 		final long f_0_5 = gd_ftofx(0.5f);
 		final long f_H = gd_itofx(src_h/2);
 		final long f_W = gd_itofx(src_w/2);
-		final long f_cos = gd_ftofx(cos(-_angle));
-		final long f_sin = gd_ftofx(sin(-_angle));
+		final long f_cos = gd_dtofx(cos(-_angle));
+		final long f_sin = gd_dtofx(sin(-_angle));
 
 		int dst_offset_x;
 		int dst_offset_y = 0;
@@ -4297,15 +4253,12 @@ TODO:
 	/* impact perf a bit, but not that much. Implementation for palette
 	   images can be done at a later point.
 	*/
-		if (!src.trueColor) {
-			src.paletteToTrueColor();
+		if (!trueColor) {
+			paletteToTrueColor();
 		}
 
-		dst = gdImageCreateTrueColor(new_width, new_height);
-		if (!dst) {
-			return null;
-		}
-		dst->saveAlphaFlag = 1;
+		dst = new GdImage(new_width, new_height, GdImageColorType.TRUE_COLOR);
+		dst.saveAlphaFlag = 1;
 
 		for (i = 0; i < new_height; i++) {
 			int j;
@@ -4319,14 +4272,14 @@ TODO:
 				long n = gd_fxtoi(f_n);
 
 				if ((n <= 0) || (m <= 0) || (m >= src_h) || (n >= src_w)) {
-					dst->tpixels[dst_offset_y][dst_offset_x++] = bgColor;
+					dst.tpixels[dst_offset_y][dst_offset_x++] = bgColor;
 				} else if ((n <= 1) || (m <= 1) || (m >= src_h - 1) || (n >= src_w - 1)) {
-					int c = getPixelInterpolated(src, n, m, bgColor);
+					int c = getPixelInterpolated(n, m, bgColor);
 					c = c | (( GdUtils.trueColorGetAlpha(c) + ((int)(127* gd_fxtof(f_slop)))) << 24);
 
-					dst->tpixels[dst_offset_y][dst_offset_x++] = _color_blend(bgColor, c);
+					dst.tpixels[dst_offset_y][dst_offset_x++] = _color_blend(bgColor, c);
 				} else {
-					dst->tpixels[dst_offset_y][dst_offset_x++] = getPixelInterpolated(src, n, m, bgColor);
+					dst.tpixels[dst_offset_y][dst_offset_x++] = getPixelInterpolated(n, m, bgColor);
 				}
 			}
 			dst_offset_y++;
@@ -4334,19 +4287,17 @@ TODO:
 		return dst;
 	}
 
-	private GdImage
-	gdImageRotateBilinear(GdImage src, final float degrees, final int bgColor)
-	{
+	private GdImage rotateBilinear(final float degrees, final int bgColor) {
 		float _angle = (float)((- degrees / 180.0f) * PI);
-		final int src_w = gdImageSX(src);
-		final int src_h = gdImageSY(src);
+		final int src_w = sx;
+		final int src_h = sy;
 		int new_width = abs((int)(src_w*cos(_angle))) + abs((int)(src_h*sin(_angle) + 0.5f));
 		int new_height = abs((int)(src_w*sin(_angle))) + abs((int)(src_h*cos(_angle) + 0.5f));
 		final long f_0_5 = gd_ftofx(0.5f);
 		final long f_H = gd_itofx(src_h/2);
 		final long f_W = gd_itofx(src_w/2);
-		final long f_cos = gd_ftofx(cos(-_angle));
-		final long f_sin = gd_ftofx(sin(-_angle));
+		final long f_cos = gd_dtofx(cos(-_angle));
+		final long f_sin = gd_dtofx(sin(-_angle));
 		final long f_1 = gd_itofx(1);
 		int i;
 		int dst_offset_x;
@@ -4357,15 +4308,12 @@ TODO:
 	/* impact perf a bit, but not that much. Implementation for palette
 	   images can be done at a later point.
 	*/
-		if (!src.trueColor) {
-			src.paletteToTrueColor();
+		if (!trueColor) {
+			paletteToTrueColor();
 		}
 
-		dst = gdImageCreateTrueColor(new_width, new_height);
-		if (dst == null) {
-			return null;
-		}
-		dst->saveAlphaFlag = 1;
+		dst = new GdImage(new_width, new_height, GdImageColorType.TRUE_COLOR);
+		dst.saveAlphaFlag = 1;
 
 		for (i = 0; i < new_height; i++) {
 			int j;
@@ -4402,7 +4350,7 @@ TODO:
 						src_offset_y = m + 1;
 					}
 					{
-						final int pixel1 = src->tpixels[src_offset_y][src_offset_x];
+						final int pixel1 = tpixels[src_offset_y][src_offset_x];
 						int pixel2, pixel3, pixel4;
 
 						if (src_offset_y + 1 >= src_h) {
@@ -4414,9 +4362,9 @@ TODO:
 							pixel3 = bgColor;
 							pixel4 = bgColor;
 						} else {
-							pixel2 = src->tpixels[src_offset_y][src_offset_x + 1];
-							pixel3 = src->tpixels[src_offset_y + 1][src_offset_x];
-							pixel4 = src->tpixels[src_offset_y + 1][src_offset_x + 1];
+							pixel2 = tpixels[src_offset_y][src_offset_x + 1];
+							pixel3 = tpixels[src_offset_y + 1][src_offset_x];
+							pixel4 = tpixels[src_offset_y + 1][src_offset_x + 1];
 						}
 						{
 							final long f_r1 = gd_itofx(GdUtils.trueColorGetRed(pixel1));
@@ -4445,11 +4393,11 @@ TODO:
 							final char blue  = (char) CLAMP(gd_fxtoi(f_blue),  0, 255);
 							final char alpha = (char) CLAMP(gd_fxtoi(f_alpha), 0, 127);
 
-							dst->tpixels[dst_offset_y][dst_offset_x++] = GdUtils.trueColorMixAlpha(red, green, blue, alpha);
+							dst.tpixels[dst_offset_y][dst_offset_x++] = GdUtils.trueColorMixAlpha(red, green, blue, alpha);
 						}
 					}
 				} else {
-					dst->tpixels[dst_offset_y][dst_offset_x++] = bgColor;
+					dst.tpixels[dst_offset_y][dst_offset_x++] = bgColor;
 				}
 			}
 			dst_offset_y++;
@@ -4457,19 +4405,17 @@ TODO:
 		return dst;
 	}
 
-	private GdImage
-	gdImageRotateBicubicFixed(GdImage src, final float degrees,final int bgColor)
-	{
+	private GdImage rotateBicubicFixed(final float degrees,final int bgColor) {
 		final float _angle = (float)((- degrees / 180.0f) * PI);
-		final int src_w = gdImageSX(src);
-		final int src_h = gdImageSY(src);
+		final int src_w = sx;
+		final int src_h = sy;
 		final int new_width = abs((int)(src_w*cos(_angle))) + abs((int)(src_h*sin(_angle) + 0.5f));
 		final int new_height = abs((int)(src_w*sin(_angle))) + abs((int)(src_h*cos(_angle) + 0.5f));
 		final long f_0_5 = gd_ftofx(0.5f);
 		final long f_H = gd_itofx(src_h/2);
 		final long f_W = gd_itofx(src_w/2);
-		final long f_cos = gd_ftofx(cos(-_angle));
-		final long f_sin = gd_ftofx(sin(-_angle));
+		final long f_cos = gd_dtofx(cos(-_angle));
+		final long f_sin = gd_dtofx(sin(-_angle));
 		final long f_1 = gd_itofx(1);
 		final long f_2 = gd_itofx(2);
 		final long f_4 = gd_itofx(4);
@@ -4484,16 +4430,16 @@ TODO:
 	/* impact perf a bit, but not that much. Implementation for palette
 	   images can be done at a later point.
 	*/
-		if (!src.trueColor) {
-			src.paletteToTrueColor();
+		if (!trueColor) {
+			paletteToTrueColor();
 		}
 
-		dst = gdImageCreateTrueColor(new_width, new_height);
+		dst = new GdImage(new_width, new_height, GdImageColorType.TRUE_COLOR);
 
 		if (dst == null) {
 			return null;
 		}
-		dst->saveAlphaFlag = 1;
+		dst.saveAlphaFlag = 1;
 
 		for (i=0; i < new_height; i++) {
 			int j;
@@ -4510,7 +4456,8 @@ TODO:
 				if ((m > 0) && (m < src_h - 1) && (n > 0) && (n < src_w-1)) {
 					final long f_f = f_m - gd_itofx(m);
 					final long f_g = f_n - gd_itofx(n);
-					int src_offset_x[16], src_offset_y[16];
+					int[] src_offset_x = new int[16];
+					int[] src_offset_y = new int[16];
 					char red, green, blue, alpha;
 					long f_red=0, f_green=0, f_blue=0, f_alpha=0;
 					int k;
@@ -4697,11 +4644,11 @@ TODO:
 								c = bgColor;
 							} else if ((src_offset_x[_k] <= 1) || (src_offset_y[_k] <= 1) || (src_offset_y[_k] >= (int)src_h - 1) || (src_offset_x[_k] >= (int)src_w - 1)) {
 								long f_127 = gd_itofx(127);
-								c = src->tpixels[src_offset_y[_k]][src_offset_x[_k]];
+								c = tpixels[src_offset_y[_k]][src_offset_x[_k]];
 								c = c | (( (int) (gd_fxtof(gd_mulfx(f_R, f_127)) + 50.5f)) << 24);
 								c = _color_blend(bgColor, c);
 							} else {
-								c = src->tpixels[src_offset_y[_k]][src_offset_x[_k]];
+								c = tpixels[src_offset_y[_k]][src_offset_x[_k]];
 							}
 
 							f_rs = gd_itofx(GdUtils.trueColorGetRed(c));
@@ -4721,9 +4668,9 @@ TODO:
 					blue  = (char) CLAMP(gd_fxtoi(gd_mulfx(f_blue, f_gama)),  0, 255);
 					alpha = (char) CLAMP(gd_fxtoi(gd_mulfx(f_alpha, f_gama)), 0, 127);
 
-					dst->tpixels[dst_offset_y][dst_offset_x] =  GdUtils.trueColorMixAlpha(red, green, blue, alpha);
+					dst.tpixels[dst_offset_y][dst_offset_x] =  GdUtils.trueColorMixAlpha(red, green, blue, alpha);
 				} else {
-					dst->tpixels[dst_offset_y][dst_offset_x] =  bgColor;
+					dst.tpixels[dst_offset_y][dst_offset_x] =  bgColor;
 				}
 				dst_offset_x++;
 			}
@@ -4733,8 +4680,7 @@ TODO:
 		return dst;
 	}
 
-	public GdImage gdImageRotateInterpolated(final GdImage src, final float angle, int bgcolor)
-	{
+	public GdImage rotateInterpolated(final float angle, int bgcolor) {
 	/* round to two decimals and keep the 100x multiplication to use it in the common square angles
 	   case later. Keep the two decimal precisions so smaller rotation steps can be done, useful for
 	   slow animations, f.e. */
@@ -4748,49 +4694,49 @@ TODO:
 	   to truecolor, as we must return truecolor image. */
 		switch (angle_rounded) {
 			case    0: {
-				GdImage dst = gdImageClone(src);
+				GdImage dst = imageClone();
 
 				if (dst == null) {
 					return null;
 				}
-				if (dst->trueColor == 0) {
-					gdImagePaletteToTrueColor(dst);
+				if (!dst.trueColor) {
+					dst.paletteToTrueColor();
 				}
 				return dst;
 			}
 
 			case -2700:
 			case   9000:
-				return gdImageRotate90(src, 0);
+				return rotate90(0);
 
 			case -18000:
 			case  18000:
-				return gdImageRotate180(src, 0);
+				return rotate180(0);
 
 			case  -9000:
 			case  27000:
-				return gdImageRotate270(src, 0);
+				return rotate270(0);
 		}
 
-		if (src == null || src->interpolation_id < 1 || src->interpolation_id > GD_METHOD_COUNT) {
+		if (src == null || interpolation_id == null) {
 			return null;
 		}
 
-		switch (src->interpolation_id) {
+		switch (interpolation_id) {
 			case GD_NEAREST_NEIGHBOUR:
-				return gdImageRotateNearestNeighbour(src, angle, bgcolor);
+				return rotateNearestNeighbour(angle, bgcolor);
 			break;
 
 			case GD_BILINEAR_FIXED:
-				return gdImageRotateBilinear(src, angle, bgcolor);
+				return rotateBilinear(angle, bgcolor);
 			break;
 
 			case GD_BICUBIC_FIXED:
-				return gdImageRotateBicubicFixed(src, angle, bgcolor);
+				return rotateBicubicFixed(angle, bgcolor);
 			break;
 
 			default:
-				return gdImageRotateGeneric(src, angle, bgcolor);
+				return rotateGeneric(angle, bgcolor);
 		}
 		return null;
 	}
@@ -4803,23 +4749,21 @@ TODO:
 	 * Group: Transform
 	 **/
 
-	private void gdImageClipRectangle(gdRectPtr r)
-	{
+	private void gdImageClipRectangle(final GdRect r) {
 		int c1x, c1y, c2x, c2y;
 		int x1,y1;
 
-		gdImageGetClip(&c1x, &c1y, &c2x, &c2y);
-		x1 = r->x + r->width - 1;
-		y1 = r->y + r->height - 1;
-		r->x = CLAMP(r->x, c1x, c2x);
-		r->y = CLAMP(r->y, c1y, c2y);
-		r->width = CLAMP(x1, c1x, c2x) - r->x + 1;
-		r->height = CLAMP(y1, c1y, c2y) - r->y + 1;
-	}
-
-	void gdDumpRect(final char *msg, gdRectPtr r)
-	{
-		printf("%s (%i, %i) (%i, %i)\n", msg, r->x, r->y, r->width, r->height);
+		final GdClipRectangle clip = getClip();
+		c1x = clip.x0;
+		c1y = clip.y0;
+		c2x = clip.x1;
+		c2y = clip.y1;
+		x1 = r.x + r.width - 1;
+		y1 = r.y + r.height - 1;
+		r.x = CLAMP(r.x, c1x, c2x);
+		r.y = CLAMP(r.y, c1y, c2y);
+		r.width = CLAMP(x1, c1x, c2x) - r.x + 1;
+		r.height = CLAMP(y1, c1y, c2y) - r.y + 1;
 	}
 
 	/**
@@ -4838,11 +4782,7 @@ TODO:
 	 * Returns:
 	 *  GD_TRUE if the affine is rectilinear or GD_FALSE
 	 */
-	public int gdTransformAffineGetImage(GdImage dst,
-			final GdImage src,
-	GdRect src_area,
-	final double affine[6])
-	{
+	public int gdTransformAffineGetImage(final GdImage dst, final GdImage src, final GdRect src_area, final double affine[6]) {
 		int res;
 		double[] m = new double[6];
 		GdRect bbox;
@@ -4851,8 +4791,8 @@ TODO:
 		if (src_area == null) {
 			area_full.x = 0;
 			area_full.y = 0;
-			area_full.width  = gdImageSX(src);
-			area_full.height = gdImageSY(src);
+			area_full.width  = src.sx;
+			area_full.height = src.sy;
 			src_area = &area_full;
 		}
 
@@ -5056,7 +4996,7 @@ TODO:
 		return GD_TRUE;
 	}
 
-	public int gdImageSetInterpolationMethod(GdInterpolationMethod id) {
+	public int setInterpolationMethod(GdInterpolationMethod id) {
 		switch (id) {
 			case GD_DEFAULT:
 				id = GdInterpolationMethod.GD_BILINEAR_FIXED;
@@ -5349,8 +5289,7 @@ TODO:
 	}
 
 	/* Rotates an image by 90 degrees (counter clockwise) */
-	GdImage gdImageRotate90 (GdImage src, int ignoretransparent)
-	{
+	GdImage rotate90 (int ignoretransparent) {
 		int uY, uX;
 		int c,r,g,b,a;
 		GdImage dst;
@@ -5394,8 +5333,7 @@ TODO:
 	}
 
 	/* Rotates an image by 180 degrees (counter clockwise) */
-	GdImage gdImageRotate180 (GdImage src, int ignoretransparent)
-	{
+	GdImage rotate180(int ignoretransparent) {
 		int uY, uX;
 		int c,r,g,b,a;
 		GdImage dst;
@@ -5441,8 +5379,7 @@ TODO:
 	}
 
 	/* Rotates an image by 270 degrees (counter clockwise) */
-	GdImage gdImageRotate270 (GdImage src, int ignoretransparent)
-	{
+	GdImage rotate270(int ignoretransparent) {
 		int uY, uX;
 		int c,r,g,b,a;
 		GdImage dst;
@@ -5487,8 +5424,7 @@ TODO:
 		return dst;
 	}
 
-	GdImage gdImageRotate45 (GdImage src, double dAngle, int clrBack, int ignoretransparent)
-	{
+	GdImage rotate45(double dAngle, int clrBack, int ignoretransparent) {
 		GdImage dst1,dst2,dst3;
 		double dRadAngle, dSinE, dTan, dShear;
 		double dOffset;     /* Variable skew offset */
@@ -5623,8 +5559,7 @@ TODO:
 		return dst3;
 	}
 
-	GdImage gdImageRotate (GdImage src, double dAngle, int clrBack, int ignoretransparent)
-	{
+	GdImage rotate(double dAngle, int clrBack, int ignoretransparent) {
 		GdImage pMidImg;
 		GdImage rotatedImg;
 
@@ -5645,33 +5580,33 @@ TODO:
 		}
 
 		if (dAngle == 90.00) {
-			return gdImageRotate90(src, ignoretransparent);
+			return rotate90(ignoretransparent);
 		}
 		if (dAngle == 180.00) {
-			return gdImageRotate180(src, ignoretransparent);
+			return rotate180(ignoretransparent);
 		}
 		if(dAngle == 270.00) {
-			return gdImageRotate270 (src, ignoretransparent);
+			return rotate270(ignoretransparent);
 		}
 
 		if ((dAngle > 45.0) && (dAngle <= 135.0)) {
-			pMidImg = gdImageRotate90 (src, ignoretransparent);
+			pMidImg = rotate90(ignoretransparent);
 			dAngle -= 90.0;
 		} else if ((dAngle > 135.0) && (dAngle <= 225.0)) {
-			pMidImg = gdImageRotate180 (src, ignoretransparent);
+			pMidImg = rotate180(ignoretransparent);
 			dAngle -= 180.0;
 		} else if ((dAngle > 225.0) && (dAngle <= 315.0)) {
-			pMidImg = gdImageRotate270 (src, ignoretransparent);
+			pMidImg = rotate270(ignoretransparent);
 			dAngle -= 270.0;
 		} else {
-			return gdImageRotate45 (src, dAngle, clrBack, ignoretransparent);
+			return rotate45(dAngle, clrBack, ignoretransparent);
 		}
 
 		if (pMidImg == null) {
 			return null;
 		}
 
-		rotatedImg = gdImageRotate45 (pMidImg, dAngle, clrBack, ignoretransparent);
+		rotatedImg = pMidImg.rotate45(dAngle, clrBack, ignoretransparent);
 
 		return rotatedImg;
 	}

@@ -1,7 +1,7 @@
 package info.miranda.gd;
 
 public class GdClipRectangle {
-	int x0, y0, x1, y1;
+	public int x0, y0, x1, y1;
 	GdClipRectangle(final int x0, final int y0, final int x1, final int y1) {
 		this.x0 = x0;
 		this.y0 = y0;
