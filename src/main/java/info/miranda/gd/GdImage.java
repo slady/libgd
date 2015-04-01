@@ -3637,7 +3637,7 @@ TODO:
 		pre scale very large images before using another interpolation
 		methods for the last step.
 	*/
-	private GdImage gdImageScaleNearestNeighbour(final int width, final int height) {
+	private GdImage scaleNearestNeighbour(final int width, final int height) {
 		final int new_width = MAX(1, width);
 		final int new_height = MAX(1, height);
 		final float dx = (float)this.sx / (float)new_width;
@@ -3737,7 +3737,7 @@ TODO:
 		}
 	}
 
-	private GdImage gdImageScaleBilinearPalette(final int new_width, final int new_height) {
+	private GdImage scaleBilinearPalette(final int new_width, final int new_height) {
 		long _width = MAX(1, new_width);
 		long _height = MAX(1, new_height);
 		float dx = (float)sx / (float)_width;
@@ -3826,7 +3826,7 @@ TODO:
 		return new_img;
 	}
 
-	private GdImage gdImageScaleBilinearTC(final int new_width, final int new_height) {
+	private GdImage scaleBilinearTC(final int new_width, final int new_height) {
 		long dst_w = MAX(1, new_width);
 		long dst_h = MAX(1, new_height);
 		float dx = (float)sx / (float)dst_w;
@@ -3903,15 +3903,15 @@ TODO:
 		return new_img;
 	}
 
-	private GdImage gdImageScaleBilinear(final int new_width, final int new_height) {
+	private GdImage scaleBilinear(final int new_width, final int new_height) {
 		if (this.trueColor) {
-			return gdImageScaleBilinearTC(new_width, new_height);
+			return scaleBilinearTC(new_width, new_height);
 		} else {
-			return gdImageScaleBilinearPalette(new_width, new_height);
+			return scaleBilinearPalette(new_width, new_height);
 		}
 	}
 
-	private GdImage gdImageScaleBicubicFixed(final int width, final int height) {
+	private GdImage scaleBicubicFixed(final int width, final int height) {
 		final int new_width = MAX(1, width);
 		final int new_height = MAX(1, height);
 		final int src_w = sx;
@@ -3942,157 +3942,162 @@ TODO:
 			dst_offset_x = 0;
 
 			for (int j=0; j < new_width; j++) {
-				final long f_a = gd_mulfx(gd_itofx(i), f_dy);
-				final long f_b = gd_mulfx(gd_itofx(j), f_dx);
-				final int m = gd_fxtoi(f_a);
-				final int n = gd_fxtoi(f_b);
-				final long f_f = f_a - gd_itofx(m);
-				final long f_g = f_b - gd_itofx(n);
-				int[] src_offset_x = new int[16];
-				int[] src_offset_y = new int[16];
+				int[] dst_row = dst.tpixels[dst_offset_y];
 				long f_red = 0, f_green = 0, f_blue = 0, f_alpha = 0;
 				char red, green, blue, alpha = 0;
-				int[] dst_row = dst.tpixels[dst_offset_y];
+				final long f_f, f_g;
+				int[] src_offset_x = new int[16];
+				int[] src_offset_y = new int[16];
+				{
+					final long f_a = gd_mulfx(gd_itofx(i), f_dy);
+					final long f_b = gd_mulfx(gd_itofx(j), f_dx);
+					final int m = gd_fxtoi(f_a);
+					final int n = gd_fxtoi(f_b);
+					f_f = f_a - gd_itofx(m);
+					f_g = f_b - gd_itofx(n);
 
-				if ((m < 1) || (n < 1)) {
-					src_offset_x[0] = n;
-					src_offset_y[0] = m;
-				} else {
-					src_offset_x[0] = n - 1;
-					src_offset_y[0] = m;
-				}
 
-				if (m < 1) {
-					src_offset_x[1] = n;
-					src_offset_y[1] = m;
-				} else {
-					src_offset_x[1] = n;
-					src_offset_y[1] = m;
-				}
+					if ((m < 1) || (n < 1)) {
+						src_offset_x[0] = n;
+						src_offset_y[0] = m;
+					} else {
+						src_offset_x[0] = n - 1;
+						src_offset_y[0] = m;
+					}
 
-				if ((m < 1) || (n >= src_w - 1)) {
-					src_offset_x[2] = n;
-					src_offset_y[2] = m;
-				} else {
-					src_offset_x[2] = n + 1;
-					src_offset_y[2] = m;
-				}
+					if (m < 1) {
+						src_offset_x[1] = n;
+						src_offset_y[1] = m;
+					} else {
+						src_offset_x[1] = n;
+						src_offset_y[1] = m;
+					}
 
-				if ((m < 1) || (n >= src_w - 2)) {
-					src_offset_x[3] = n;
-					src_offset_y[3] = m;
-				} else {
-					src_offset_x[3] = n + 1 + 1;
-					src_offset_y[3] = m;
-				}
+					if ((m < 1) || (n >= src_w - 1)) {
+						src_offset_x[2] = n;
+						src_offset_y[2] = m;
+					} else {
+						src_offset_x[2] = n + 1;
+						src_offset_y[2] = m;
+					}
 
-				if (n < 1) {
-					src_offset_x[4] = n;
-					src_offset_y[4] = m;
-				} else {
-					src_offset_x[4] = n - 1;
-					src_offset_y[4] = m;
-				}
+					if ((m < 1) || (n >= src_w - 2)) {
+						src_offset_x[3] = n;
+						src_offset_y[3] = m;
+					} else {
+						src_offset_x[3] = n + 1 + 1;
+						src_offset_y[3] = m;
+					}
 
-				src_offset_x[5] = n;
-				src_offset_y[5] = m;
-				if (n >= src_w-1) {
-					src_offset_x[6] = n;
-					src_offset_y[6] = m;
-				} else {
-					src_offset_x[6] = n + 1;
-					src_offset_y[6] = m;
-				}
+					if (n < 1) {
+						src_offset_x[4] = n;
+						src_offset_y[4] = m;
+					} else {
+						src_offset_x[4] = n - 1;
+						src_offset_y[4] = m;
+					}
 
-				if (n >= src_w - 2) {
-					src_offset_x[7] = n;
-					src_offset_y[7] = m;
-				} else {
-					src_offset_x[7] = n + 1 + 1;
-					src_offset_y[7] = m;
-				}
+					src_offset_x[5] = n;
+					src_offset_y[5] = m;
+					if (n >= src_w-1) {
+						src_offset_x[6] = n;
+						src_offset_y[6] = m;
+					} else {
+						src_offset_x[6] = n + 1;
+						src_offset_y[6] = m;
+					}
 
-				if ((m >= src_h - 1) || (n < 1)) {
-					src_offset_x[8] = n;
-					src_offset_y[8] = m;
-				} else {
-					src_offset_x[8] = n - 1;
-					src_offset_y[8] = m;
-				}
+					if (n >= src_w - 2) {
+						src_offset_x[7] = n;
+						src_offset_y[7] = m;
+					} else {
+						src_offset_x[7] = n + 1 + 1;
+						src_offset_y[7] = m;
+					}
 
-				if (m >= src_h - 1) {
-					src_offset_x[8] = n;
-					src_offset_y[8] = m;
-				} else {
-					src_offset_x[9] = n;
-					src_offset_y[9] = m;
-				}
+					if ((m >= src_h - 1) || (n < 1)) {
+						src_offset_x[8] = n;
+						src_offset_y[8] = m;
+					} else {
+						src_offset_x[8] = n - 1;
+						src_offset_y[8] = m;
+					}
 
-				if ((m >= src_h-1) || (n >= src_w-1)) {
-					src_offset_x[10] = n;
-					src_offset_y[10] = m;
-				} else {
-					src_offset_x[10] = n + 1;
-					src_offset_y[10] = m;
-				}
+					if (m >= src_h - 1) {
+						src_offset_x[8] = n;
+						src_offset_y[8] = m;
+					} else {
+						src_offset_x[9] = n;
+						src_offset_y[9] = m;
+					}
 
-				if ((m >= src_h - 1) || (n >= src_w - 2)) {
-					src_offset_x[11] = n;
-					src_offset_y[11] = m;
-				} else {
-					src_offset_x[11] = n + 1 + 1;
-					src_offset_y[11] = m;
-				}
+					if ((m >= src_h-1) || (n >= src_w-1)) {
+						src_offset_x[10] = n;
+						src_offset_y[10] = m;
+					} else {
+						src_offset_x[10] = n + 1;
+						src_offset_y[10] = m;
+					}
 
-				if ((m >= src_h - 2) || (n < 1)) {
-					src_offset_x[12] = n;
-					src_offset_y[12] = m;
-				} else {
-					src_offset_x[12] = n - 1;
-					src_offset_y[12] = m;
-				}
+					if ((m >= src_h - 1) || (n >= src_w - 2)) {
+						src_offset_x[11] = n;
+						src_offset_y[11] = m;
+					} else {
+						src_offset_x[11] = n + 1 + 1;
+						src_offset_y[11] = m;
+					}
 
-				if (m >= src_h - 2) {
-					src_offset_x[13] = n;
-					src_offset_y[13] = m;
-				} else {
-					src_offset_x[13] = n;
-					src_offset_y[13] = m;
-				}
+					if ((m >= src_h - 2) || (n < 1)) {
+						src_offset_x[12] = n;
+						src_offset_y[12] = m;
+					} else {
+						src_offset_x[12] = n - 1;
+						src_offset_y[12] = m;
+					}
 
-				if ((m >= src_h - 2) || (n >= src_w - 1)) {
-					src_offset_x[14] = n;
-					src_offset_y[14] = m;
-				} else {
-					src_offset_x[14] = n + 1;
-					src_offset_y[14] = m;
-				}
+					if (m >= src_h - 2) {
+						src_offset_x[13] = n;
+						src_offset_y[13] = m;
+					} else {
+						src_offset_x[13] = n;
+						src_offset_y[13] = m;
+					}
 
-				if ((m >= src_h - 2) || (n >= src_w - 2)) {
-					src_offset_x[15] = n;
-					src_offset_y[15] = m;
-				} else {
-					src_offset_x[15] = n  + 1 + 1;
-					src_offset_y[15] = m;
+					if ((m >= src_h - 2) || (n >= src_w - 1)) {
+						src_offset_x[14] = n;
+						src_offset_y[14] = m;
+					} else {
+						src_offset_x[14] = n + 1;
+						src_offset_y[14] = m;
+					}
+
+					if ((m >= src_h - 2) || (n >= src_w - 2)) {
+						src_offset_x[15] = n;
+						src_offset_y[15] = m;
+					} else {
+						src_offset_x[15] = n  + 1 + 1;
+						src_offset_y[15] = m;
+					}
 				}
 
 				for (int k = -1; k < 3; k++) {
-					final long f = gd_itofx(k)-f_f;
-					final long f_fm1 = f - f_1;
-					final long f_fp1 = f + f_1;
-					final long f_fp2 = f + f_2;
-					long f_a = 0, f_b = 0, f_d = 0, f_c = 0;
 					long f_RY;
-					int l;
+					{
+						final long f = gd_itofx(k)-f_f;
+						final long f_fm1 = f - f_1;
+						final long f_fp1 = f + f_1;
+						final long f_fp2 = f + f_2;
+						long f_a = 0, f_b = 0, f_d = 0, f_c = 0;
 
-					if (f_fp2 > 0) f_a = gd_mulfx(f_fp2, gd_mulfx(f_fp2,f_fp2));
-					if (f_fp1 > 0) f_b = gd_mulfx(f_fp1, gd_mulfx(f_fp1,f_fp1));
-					if (f > 0)     f_c = gd_mulfx(f, gd_mulfx(f,f));
-					if (f_fm1 > 0) f_d = gd_mulfx(f_fm1, gd_mulfx(f_fm1,f_fm1));
+						if (f_fp2 > 0) f_a = gd_mulfx(f_fp2, gd_mulfx(f_fp2,f_fp2));
+						if (f_fp1 > 0) f_b = gd_mulfx(f_fp1, gd_mulfx(f_fp1,f_fp1));
+						if (f > 0)     f_c = gd_mulfx(f, gd_mulfx(f,f));
+						if (f_fm1 > 0) f_d = gd_mulfx(f_fm1, gd_mulfx(f_fm1,f_fm1));
 
-					f_RY = gd_divfx((f_a - gd_mulfx(f_4,f_b) + gd_mulfx(f_6,f_c) - gd_mulfx(f_4,f_d)),f_6);
+						f_RY = gd_divfx((f_a - gd_mulfx(f_4,f_b) + gd_mulfx(f_6,f_c) - gd_mulfx(f_4,f_d)),f_6);
+					}
 
-					for (l = -1; l < 3; l++) {
+					for (int l = -1; l < 3; l++) {
 						final long f = gd_itofx(l) - f_g;
 						final long f_fm1 = f - f_1;
 						final long f_fp1 = f + f_1;
@@ -4150,15 +4155,15 @@ TODO:
 		switch (interpolation_id) {
 		/*Special cases, optimized implementations */
 			case GD_NEAREST_NEIGHBOUR:
-				im_scaled = gdImageScaleNearestNeighbour(new_width, new_height);
+				im_scaled = scaleNearestNeighbour(new_width, new_height);
 				break;
 
 			case GD_BILINEAR_FIXED:
-				im_scaled = gdImageScaleBilinear(new_width, new_height);
+				im_scaled = scaleBilinear(new_width, new_height);
 				break;
 
 			case GD_BICUBIC_FIXED:
-				im_scaled = gdImageScaleBicubicFixed(new_width, new_height);
+				im_scaled = scaleBicubicFixed(new_width, new_height);
 				break;
 
 		/* generic */
