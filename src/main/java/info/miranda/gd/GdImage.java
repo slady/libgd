@@ -4708,15 +4708,15 @@ TODO:
 
 			case -2700:
 			case   9000:
-				return rotate90(0);
+				return rotate90(false);
 
 			case -18000:
 			case  18000:
-				return rotate180(0);
+				return rotate180(false);
 
 			case  -9000:
 			case  27000:
-				return rotate270(0);
+				return rotate270(false);
 		}
 
 		if (src == null || interpolation_id == null) {
@@ -5203,7 +5203,7 @@ TODO:
 		}
 	}
 
-	void skewY (GdImage dst, GdImage src, int uCol, int iOffset, double dWeight, final int clrBack, final boolean ignoretransparent) {
+	void skewY(GdImage dst, GdImage src, int uCol, int iOffset, double dWeight, final int clrBack, final boolean ignoretransparent) {
 		int i, iYPos=0, r, g, b, a;
 		FuncPtr f;
 		int pxlOldLeft, pxlLeft=0, pxlSrc;
@@ -5215,7 +5215,7 @@ TODO:
 		}
 
 		for (i = 0; i<=iOffset; i++) {
-			gdImageSetPixel (dst, uCol, i, clrBack);
+			dst.setPixel(uCol, i, clrBack);
 		}
 		r = (int)((double)gdImageRed(src,clrBack) * dWeight);
 		g = (int)((double)gdImageGreen(src,clrBack) * dWeight);
@@ -5289,7 +5289,7 @@ TODO:
 	}
 
 	/* Rotates an image by 90 degrees (counter clockwise) */
-	public GdImage rotate90(final int ignoretransparent) {
+	public GdImage rotate90(final boolean ignoretransparent) {
 		int uY, uX;
 		int c,r,g,b,a;
 		FuncPtr f;
@@ -5421,7 +5421,7 @@ TODO:
 		return dst;
 	}
 
-	public GdImage rotate45(final double dAngle, final int clrBack, final int ignoretransparent) {
+	public GdImage rotate45(final double dAngle, final int clrBack, final boolean ignoretransparent) {
 		GdImage dst1,dst2,dst3;
 		double dRadAngle, dSinE, dTan, dShear;
 		double dOffset;     /* Variable skew offset */
@@ -5556,7 +5556,7 @@ TODO:
 		return dst3;
 	}
 
-	GdImage rotate(double dAngle, int clrBack, int ignoretransparent) {
+	GdImage rotate(final double dAngle, final int clrBack, final boolean ignoretransparent) {
 		GdImage pMidImg;
 		GdImage rotatedImg;
 
