@@ -7,6 +7,7 @@ import info.miranda.gd.enums.GdInterpolationMethod;
 import info.miranda.gd.filter.*;
 import info.miranda.gd.interfaces.GdCallbackImageColor;
 import info.miranda.gd.interfaces.GdFilterInterface;
+import info.miranda.gd.utils.GdAffine;
 import info.miranda.gd.utils.GdRect;
 
 import java.util.HashMap;
@@ -4146,11 +4147,11 @@ TODO:
 	}
 
 	public GdImage scale(final int new_width, final int new_height) {
-		GdImage im_scaled = null;
-
-		if (src == null || interpolation_id == null) {
+		if (interpolation_id == null) {
 			return null;
 		}
+
+		GdImage im_scaled = null;
 
 		switch (interpolation_id) {
 		/*Special cases, optimized implementations */
@@ -4687,6 +4688,10 @@ TODO:
 	}
 
 	public GdImage rotateInterpolated(final float angle, int bgcolor) {
+		if (interpolation_id == null) {
+			return null;
+		}
+
 	/* round to two decimals and keep the 100x multiplication to use it in the common square angles
 	   case later. Keep the two decimal precisions so smaller rotation steps can be done, useful for
 	   slow animations, f.e. */
@@ -4724,27 +4729,19 @@ TODO:
 				return rotate270(false);
 		}
 
-		if (src == null || interpolation_id == null) {
-			return null;
-		}
-
 		switch (interpolation_id) {
 			case GD_NEAREST_NEIGHBOUR:
 				return rotateNearestNeighbour(angle, bgcolor);
-			break;
 
 			case GD_BILINEAR_FIXED:
 				return rotateBilinear(angle, bgcolor);
-			break;
 
 			case GD_BICUBIC_FIXED:
 				return rotateBicubicFixed(angle, bgcolor);
-			break;
 
 			default:
 				return rotateGeneric(angle, bgcolor);
 		}
-		return null;
 	}
 
 /**
@@ -4788,7 +4785,7 @@ TODO:
 	 * Returns:
 	 *  GD_TRUE if the affine is rectilinear or GD_FALSE
 	 */
-	public int gdTransformAffineGetImage(final GdImage dst, final GdImage src, final GdRect src_area, final double affine[6]) {
+	public int gdTransformAffineGetImage(final GdImage dst, final GdImage src, GdRect src_area, final GdAffine affine) {
 		int res;
 		double[] m = new double[6];
 		GdRect bbox;
@@ -4806,8 +4803,8 @@ TODO:
 
 		*dst = gdImageCreateTrueColor(bbox.width, bbox.height);
 		if (*dst == null) {
-		return GD_FALSE;
-	}
+			return GD_FALSE;
+		}
 		(*dst)->saveAlphaFlag = 1;
 
 		if (!src.trueColor) {
@@ -4818,21 +4815,9 @@ TODO:
 		gdAffineTranslate(m, -bbox.x, -bbox.y);
 		gdAffineConcat(m, affine, m);
 
-		gdImageAlphaBlending(*dst, 0);
+		dst.setAlphaBlending(GdEffect.REPLACE);
 
-		res = gdTransformAffineCopy(*dst,
-				0,0,
-				src,
-				src_area,
-				m);
-
-		if (res != GD_TRUE) {
-			gdImageDestroy(*dst);
-			dst = null;
-			return GD_FALSE;
-		} else {
-			return GD_TRUE;
-		}
+		return gdTransformAffineCopy(*dst, 0, 0, src, src_area, m);
 	}
 
 	/**
@@ -4850,103 +4835,105 @@ TODO:
 	 * Returns:
 	 *  GD_TRUE if the affine is rectilinear or GD_FALSE
 	 */
-	BGD_DECLARE(int) gdTransformAffineCopy(GdImage dst,
-	int dst_x, int dst_y,
-	final GdImage src,
-	gdRectPtr src_region,
-	final double affine[6])
-	{
+	public boolean gdTransformAffineCopy(GdImage dst, int dst_x, int dst_y, final GdImage src, GdRect src_region, final GdAffine affine) {
 		int c1x,c1y,c2x,c2y;
-		int backclip = 0;
+		boolean backclip = false;
 		int backup_clipx1, backup_clipy1, backup_clipx2, backup_clipy2;
-		int x, y, src_offset_x, src_offset_y;
-		double inv[6];
-		int *dst_p;
-		gdPointF pt, src_pt;
-		gdRect bbox;
+		GdPointF pt, src_pt;
+		GdRect bbox;
 		int end_x, end_y;
-		gdInterpolationMethod interpolation_id_bak = GD_DEFAULT;
+		GdInterpolationMethod interpolation_id_bak = GdInterpolationMethod.GD_DEFAULT;
 
 	/* These methods use special implementations */
-		if (src->interpolation_id == GD_BILINEAR_FIXED || src->interpolation_id == GD_BICUBIC_FIXED || src->interpolation_id == GD_NEAREST_NEIGHBOUR) {
-			interpolation_id_bak = src->interpolation_id;
+		if (src.interpolation_id == GdInterpolationMethod.GD_BILINEAR_FIXED || src.interpolation_id == GdInterpolationMethod.GD_BICUBIC_FIXED || src.interpolation_id == GdInterpolationMethod.GD_NEAREST_NEIGHBOUR) {
+			interpolation_id_bak = src.interpolation_id;
 
-			gdImageSetInterpolationMethod(src, GD_BICUBIC);
+			src.setInterpolationMethod(GdInterpolationMethod.GD_BICUBIC);
 		}
 
 
-		gdImageClipRectangle(src, src_region);
+		src.gdImageClipRectangle(src_region);
 
-		if (src_region->x > 0 || src_region->y > 0
-				|| src_region->width < gdImageSX(src)
-				|| src_region->height < gdImageSY(src)) {
-			backclip = 1;
+		if (src_region.x > 0 || src_region.y > 0
+				|| src_region.width < src.sx
+				|| src_region.height < src.sy) {
+			backclip = true;
 
-			gdImageGetClip(src, &backup_clipx1, &backup_clipy1,
-			&backup_clipx2, &backup_clipy2);
+			final GdClipRectangle clip = src.getClip();
+			backup_clipx1 = clip.x0;
+			backup_clipy1 = clip.y0;
+			backup_clipx2 = clip.x1;
+			backup_clipy2 = clip.y1;
 
-			gdImageSetClip(src, src_region->x, src_region->y,
-					src_region->x + src_region->width - 1,
-					src_region->y + src_region->height - 1);
+			src.setClip(src_region.x, src_region.y,
+					src_region.x + src_region.width - 1,
+					src_region.y + src_region.height - 1);
 		}
 
 		if (!gdTransformAffineBoundingBox(src_region, affine, &bbox)) {
-		if (backclip) {
-			gdImageSetClip(src, backup_clipx1, backup_clipy1,
-					backup_clipx2, backup_clipy2);
+			if (backclip) {
+				src.setClip(backup_clipx1, backup_clipy1,
+						backup_clipx2, backup_clipy2);
+			}
+			src.setInterpolationMethod(interpolation_id_bak);
+			return false;
 		}
-		gdImageSetInterpolationMethod(src, interpolation_id_bak);
-		return GD_FALSE;
-	}
 
-		gdImageGetClip(dst, &c1x, &c1y, &c2x, &c2y);
+		final GdClipRectangle clip = dst.getClip();
+		c1x = clip.x0;
+		c1y = clip.y0;
+		c2x = clip.x1;
+		c2y = clip.y1;
 
 		end_x = bbox.width  + (int) abs(bbox.x);
 		end_y = bbox.height + (int) abs(bbox.y);
 
 	/* Get inverse affine to let us work with destination -> source */
-		gdAffineInvert(inv, affine);
+		final GdAffine inv = affine.invert();
 
-		src_offset_x =  src_region->x;
-		src_offset_y =  src_region->y;
+		final int src_offset_x =  src_region.x;
+		final int src_offset_y =  src_region.y;
 
-		if (dst->alphaBlendingFlag) {
-			for (y = bbox.y; y <= end_y; y++) {
+		if (dst.alphaBlendingFlag == GdEffect.REPLACE) {
+			for (int y = bbox.y; y <= end_y; y++) {
 				pt.y = y + 0.5;
-				for (x = 0; x <= end_x; x++) {
+				for (int x = 0; x <= end_x; x++) {
 					pt.x = x + 0.5;
 					gdAffineApplyToPointF(&src_pt, &pt, inv);
-					gdImageSetPixel(dst, dst_x + x, dst_y + y, getPixelInterpolated(src, src_offset_x + src_pt.x, src_offset_y + src_pt.y, 0));
+					dst.setPixel(dst_x + x, dst_y + y, src.getPixelInterpolated(src_offset_x + src_pt.x, src_offset_y + src_pt.y, 0));
 				}
 			}
 		} else {
-			for (y = 0; y <= end_y; y++) {
+			for (int y = 0; y <= end_y; y++) {
 				pt.y = y + 0.5 + bbox.y;
-				if ((dst_y + y) < 0 || ((dst_y + y) > gdImageSY(dst) -1)) {
+				if ((dst_y + y) < 0 || ((dst_y + y) > dst.sy -1)) {
 					continue;
 				}
-				dst_p = dst->tpixels[dst_y + y] + dst_x;
 
-				for (x = 0; x <= end_x; x++) {
+				final int[] dst_row = dst.tpixels[dst_y + y];
+				int dst_p = dst_x;
+
+				for (int x = 0; x <= end_x; x++) {
 					pt.x = x + 0.5 + bbox.x;
 					gdAffineApplyToPointF(&src_pt, &pt, inv);
 
-					if ((dst_x + x) < 0 || (dst_x + x) > (gdImageSX(dst) - 1)) {
+					if ((dst_x + x) < 0 || (dst_x + x) > (dst.sx - 1)) {
 						break;
 					}
-					*(dst_p++) = getPixelInterpolated(src, src_offset_x + src_pt.x, src_offset_y + src_pt.y, -1);
+					dst_row[dst_p] = src.getPixelInterpolated(src_offset_x + src_pt.x, src_offset_y + src_pt.y, -1);
+					dst_p++;
 				}
 			}
 		}
 
 	/* Restore clip if required */
 		if (backclip) {
-			gdImageSetClip(src, backup_clipx1, backup_clipy1,
+			src.setClip(backup_clipx1, backup_clipy1,
 					backup_clipx2, backup_clipy2);
 		}
 
-		gdImageSetInterpolationMethod(src, interpolation_id_bak);
-		return GD_TRUE;
+		src.setInterpolationMethod(interpolation_id_bak);
+		return true;
 	}
 
 	/**
@@ -4962,24 +4949,24 @@ TODO:
 	 * Returns:
 	 *  GD_TRUE if the affine is rectilinear or GD_FALSE
 	 */
-	BGD_DECLARE(int) gdTransformAffineBoundingBox(gdRectPtr src, final double affine[6], gdRectPtr bbox)
-	{
-		gdPointF extent[4], min, max, point;
+	public boolean gdTransformAffineBoundingBox(final GdRect src, final double affine[6], final GdRect bbox) {
+		GdPointF[] extent = new GdPointF[4];
+		GdPointF min, max, point;
 		int i;
 
 		extent[0].x=0.0;
 		extent[0].y=0.0;
-		extent[1].x=(double) src->width;
+		extent[1].x=(double) src.width;
 		extent[1].y=0.0;
-		extent[2].x=(double) src->width;
-		extent[2].y=(double) src->height;
+		extent[2].x=(double) src.width;
+		extent[2].y=(double) src.height;
 		extent[3].x=0.0;
-		extent[3].y=(double) src->height;
+		extent[3].y=(double) src.height;
 
 		for (i=0; i < 4; i++) {
 			point=extent[i];
 			if (gdAffineApplyToPointF(&extent[i], &point, affine) != GD_TRUE) {
-				return GD_FALSE;
+				return false;
 			}
 		}
 		min=extent[0];
@@ -4995,11 +4982,11 @@ TODO:
 			if (max.y < extent[i].y)
 				max.y=extent[i].y;
 		}
-		bbox->x = (int) min.x;
-		bbox->y = (int) min.y;
-		bbox->width  = (int) floor(max.x - min.x) - 1;
-		bbox->height = (int) floor(max.y - min.y);
-		return GD_TRUE;
+		bbox.x = (int) min.x;
+		bbox.y = (int) min.y;
+		bbox.width  = (int) floor(max.x - min.x) - 1;
+		bbox.height = (int) floor(max.y - min.y);
+		return true;
 	}
 
 	public int setInterpolationMethod(GdInterpolationMethod id) {
@@ -5112,8 +5099,7 @@ TODO:
  * by Pierre-Alain Joye (pierre@php.net)
  **/
 	private static final double ROTATE_DEG2RAD = PI/180;
-	void gdImageSkewX (GdImage dst, GdImage src, int uRow, int iOffset, double dWeight, int clrBack, int ignoretransparent)
-	{
+	void skewX(GdImage dst, GdImage src, int uRow, int iOffset, double dWeight, int clrBack, int ignoretransparent) {
 		int i, r, g, b, a, clrBackR, clrBackG, clrBackB, clrBackA;
 		FuncPtr f;
 
@@ -5477,7 +5463,7 @@ TODO:
 			}
 
 			iShear = (int)floor(dShear);
-			gdImageSkewX(dst1, src, u, iShear, (dShear - iShear), clrBack, ignoretransparent);
+			skewX(dst1, src, u, iShear, (dShear - iShear), clrBack, ignoretransparent);
 		}
 
 	/*
@@ -5520,7 +5506,7 @@ TODO:
 
 		for (u = 0; u < dst2->sx; u++, dOffset -= dSinE) {
 			iShear = (int)floor (dOffset);
-			gdImageSkewY(dst2, dst1, u, iShear, (dOffset - (double)iShear), clrBack, ignoretransparent);
+			skewY(dst2, dst1, u, iShear, (dOffset - (double) iShear), clrBack, ignoretransparent);
 		}
 
 	/* 3rd shear */
@@ -5553,7 +5539,7 @@ TODO:
 
 		for (u = 0; u < dst3->sy; u++, dOffset += dTan) {
 			int iShear = (int)floor(dOffset);
-			gdImageSkewX(dst3, dst2, u, iShear, (dOffset - iShear), clrBack, ignoretransparent);
+			skewX(dst3, dst2, u, iShear, (dOffset - iShear), clrBack, ignoretransparent);
 		}
 
 		gdImageDestroy(dst2);
