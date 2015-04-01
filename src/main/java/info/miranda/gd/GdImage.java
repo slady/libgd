@@ -23,6 +23,7 @@ import static java.lang.Math.floor;
 import static java.lang.Math.pow;
 import static java.lang.Math.sin;
 import static java.lang.Math.sqrt;
+import static java.lang.Math.tan;
 
 /*
    The data structure in which gd stores images.
@@ -4793,7 +4794,7 @@ TODO:
 			area_full.y = 0;
 			area_full.width  = src.sx;
 			area_full.height = src.sy;
-			src_area = &area_full;
+			src_area = area_full;
 		}
 
 		gdTransformAffineBoundingBox(src_area, affine, &bbox);
@@ -5202,13 +5203,12 @@ TODO:
 		}
 	}
 
-	void gdImageSkewY (GdImage dst, GdImage src, int uCol, int iOffset, double dWeight, int clrBack, int ignoretransparent)
-	{
+	void skewY (GdImage dst, GdImage src, int uCol, int iOffset, double dWeight, final int clrBack, final boolean ignoretransparent) {
 		int i, iYPos=0, r, g, b, a;
 		FuncPtr f;
 		int pxlOldLeft, pxlLeft=0, pxlSrc;
 
-		if (src->trueColor) {
+		if (src.trueColor) {
 			f = gdImageGetTrueColorPixel;
 		} else {
 			f = gdImageGetPixel;
@@ -5224,7 +5224,7 @@ TODO:
 
 		pxlOldLeft = gdImageColorAllocateAlpha(dst, r, g, b, a);
 
-		for (i = 0; i < src->sy; i++) {
+		for (i = 0; i < src.sy; i++) {
 			pxlSrc = f (src, uCol, i);
 			iYPos = i + iOffset;
 
@@ -5260,8 +5260,8 @@ TODO:
 				a = 127;
 			}
 
-			if (ignoretransparent && pxlSrc == dst->transparent) {
-				pxlSrc = dst->transparent;
+			if (ignoretransparent && pxlSrc == dst.transparent) {
+				pxlSrc = dst.transparent;
 			} else {
 				pxlSrc = gdImageColorAllocateAlpha(dst, r, g, b, a);
 
@@ -5270,85 +5270,82 @@ TODO:
 				}
 			}
 
-			if ((iYPos >= 0) && (iYPos < dst->sy)) {
-				gdImageSetPixel (dst, uCol, iYPos, pxlSrc);
+			if ((iYPos >= 0) && (iYPos < dst.sy)) {
+				dst.setPixel(uCol, iYPos, pxlSrc);
 			}
 
 			pxlOldLeft = pxlLeft;
 		}
 
 		i = iYPos;
-		if (i < dst->sy) {
-			gdImageSetPixel (dst, uCol, i, pxlLeft);
+		if (i < dst.sy) {
+			dst.setPixel(uCol, i, pxlLeft);
 		}
 
 		i--;
-		while (++i < dst->sy) {
-			gdImageSetPixel (dst, uCol, i, clrBack);
+		while (++i < dst.sy) {
+			dst.setPixel(uCol, i, clrBack);
 		}
 	}
 
 	/* Rotates an image by 90 degrees (counter clockwise) */
-	GdImage rotate90 (int ignoretransparent) {
+	public GdImage rotate90(final int ignoretransparent) {
 		int uY, uX;
 		int c,r,g,b,a;
-		GdImage dst;
 		FuncPtr f;
 
-		if (src->trueColor) {
+		if (src.trueColor) {
 			f = gdImageGetTrueColorPixel;
 		} else {
 			f = gdImageGetPixel;
 		}
-		dst = gdImageCreateTrueColor(src->sy, src->sx);
-		if (dst != null) {
-			int old_blendmode = dst->alphaBlendingFlag;
-			dst->alphaBlendingFlag = 0;
+		final GdImage dst = new GdImage(sy, sx);
+		int old_blendmode = dst.alphaBlendingFlag;
+		dst.alphaBlendingFlag = 0;
 
-			dst->transparent = src->transparent;
+		dst.transparent = transparent;
 
-			gdImagePaletteCopy (dst, src);
+		gdImagePaletteCopy (dst, src);
 
-			for (uY = 0; uY<src->sy; uY++) {
-				for (uX = 0; uX<src->sx; uX++) {
-					c = f (src, uX, uY);
-					if (!src->trueColor) {
-						r = gdImageRed(src,c);
-						g = gdImageGreen(src,c);
-						b = gdImageBlue(src,c);
-						a = gdImageAlpha(src,c);
-						c = GdUtils.trueColorMixAlpha(r, g, b, a);
-					}
-					if (ignoretransparent && c == dst->transparent) {
-						gdImageSetPixel(dst, uY, (dst->sy - uX - 1), dst->transparent);
-					} else {
-						gdImageSetPixel(dst, uY, (dst->sy - uX - 1), c);
-					}
+		for (uY = 0; uY<sy; uY++) {
+			for (uX = 0; uX<sx; uX++) {
+				c = f (src, uX, uY);
+				if (!trueColor) {
+					r = gdImageRed(src,c);
+					g = gdImageGreen(src,c);
+					b = gdImageBlue(src,c);
+					a = gdImageAlpha(src,c);
+					c = GdUtils.trueColorMixAlpha(r, g, b, a);
+				}
+				if (ignoretransparent && c == dst.transparent) {
+					gdImageSetPixel(dst, uY, (dst.sy - uX - 1), dst.transparent);
+				} else {
+					gdImageSetPixel(dst, uY, (dst.sy - uX - 1), c);
 				}
 			}
-			dst->alphaBlendingFlag = old_blendmode;
 		}
+		dst.alphaBlendingFlag = old_blendmode;
 
 		return dst;
 	}
 
 	/* Rotates an image by 180 degrees (counter clockwise) */
-	GdImage rotate180(int ignoretransparent) {
+	GdImage rotate180(final boolean ignoretransparent) {
 		int uY, uX;
 		int c,r,g,b,a;
 		GdImage dst;
 		FuncPtr f;
 
-		if (src->trueColor) {
+		if (src.trueColor) {
 			f = gdImageGetTrueColorPixel;
 		} else {
 			f = gdImageGetPixel;
 		}
-		dst = gdImageCreateTrueColor(src->sx, src->sy);
+		dst = gdImageCreateTrueColor(this.sx, this.sy);
 
 		if (dst != null) {
-			int old_blendmode = dst->alphaBlendingFlag;
-			dst->alphaBlendingFlag = 0;
+			int old_blendmode = dst.alphaBlendingFlag;
+			dst.alphaBlendingFlag = 0;
 
 			dst->transparent = src->transparent;
 
@@ -5365,45 +5362,45 @@ TODO:
 						c = GdUtils.trueColorMixAlpha(r, g, b, a);
 					}
 
-					if (ignoretransparent && c == dst->transparent) {
+					if (ignoretransparent && c == dst.transparent) {
 						gdImageSetPixel(dst, (dst->sx - uX - 1), (dst->sy - uY - 1), dst->transparent);
 					} else {
 						gdImageSetPixel(dst, (dst->sx - uX - 1), (dst->sy - uY - 1), c);
 					}
 				}
 			}
-			dst->alphaBlendingFlag = old_blendmode;
+			dst.alphaBlendingFlag = old_blendmode;
 		}
 
 		return dst;
 	}
 
 	/* Rotates an image by 270 degrees (counter clockwise) */
-	GdImage rotate270(int ignoretransparent) {
+	GdImage rotate270(final boolean ignoretransparent) {
 		int uY, uX;
 		int c,r,g,b,a;
 		GdImage dst;
 		FuncPtr f;
 
-		if (src->trueColor) {
+		if (this.trueColor) {
 			f = gdImageGetTrueColorPixel;
 		} else {
 			f = gdImageGetPixel;
 		}
-		dst = gdImageCreateTrueColor (src->sy, src->sx);
+		dst = gdImageCreateTrueColor (this.sy, this.sx);
 
 		if (dst != null) {
-			int old_blendmode = dst->alphaBlendingFlag;
-			dst->alphaBlendingFlag = 0;
+			final GdEffect old_blendmode = dst.alphaBlendingFlag;
+			dst.alphaBlendingFlag = GdEffect.REPLACE;
 
-			dst->transparent = src->transparent;
+			dst.transparent = this.transparent;
 
 			gdImagePaletteCopy (dst, src);
 
-			for (uY = 0; uY<src->sy; uY++) {
-				for (uX = 0; uX<src->sx; uX++) {
+			for (uY = 0; uY<this.sy; uY++) {
+				for (uX = 0; uX<this.sx; uX++) {
 					c = f (src, uX, uY);
-					if (!src->trueColor) {
+					if (!this.trueColor) {
 						r = gdImageRed(src,c);
 						g = gdImageGreen(src,c);
 						b = gdImageBlue(src,c);
@@ -5411,20 +5408,20 @@ TODO:
 						c = GdUtils.trueColorMixAlpha(r, g, b, a);
 					}
 
-					if (ignoretransparent && c == dst->transparent) {
-						gdImageSetPixel(dst, (dst->sx - uY - 1), uX, dst->transparent);
+					if (ignoretransparent && c == dst.transparent) {
+						gdImageSetPixel(dst, (dst.sx - uY - 1), uX, dst.transparent);
 					} else {
-						gdImageSetPixel(dst, (dst->sx - uY - 1), uX, c);
+						gdImageSetPixel(dst, (dst.sx - uY - 1), uX, c);
 					}
 				}
 			}
-			dst->alphaBlendingFlag = old_blendmode;
+			dst.alphaBlendingFlag = old_blendmode;
 		}
 
 		return dst;
 	}
 
-	GdImage rotate45(double dAngle, int clrBack, int ignoretransparent) {
+	public GdImage rotate45(final double dAngle, final int clrBack, final int ignoretransparent) {
 		GdImage dst1,dst2,dst3;
 		double dRadAngle, dSinE, dTan, dShear;
 		double dOffset;     /* Variable skew offset */
@@ -5434,10 +5431,10 @@ TODO:
 	/* See GEMS I for the algorithm details */
 		dRadAngle = dAngle * ROTATE_DEG2RAD; /* Angle in radians */
 		dSinE = sin (dRadAngle);
-		dTan = tan (dRadAngle / 2.0);
+		dTan = tan(dRadAngle / 2.0);
 
-		newx = (int)(src->sx + src->sy * abs(dTan));
-		newy = src->sy;
+		newx = (int)(this.sx + this.sy * abs(dTan));
+		newy = this.sy;
 
 	/* 1st shear */
 		dst1 = gdImageCreateTrueColor(newx, newy);
@@ -5446,13 +5443,13 @@ TODO:
 			return null;
 		}
 		#ifdef HAVE_GD_BUNDLED
-		dst1->alphaBlendingFlag = gdEffectReplace;
+		dst1.alphaBlendingFlag = gdEffectReplace;
 		#else
 		gdImageAlphaBlending(dst1, 0);
 		#endif
 		if (dAngle == 0.0) {
 		/* Returns copy of src */
-			gdImageCopy (dst1, src,0,0,0,0,src->sx,src->sy);
+			gdImageCopy (dst1, src,0,0,0,0,this.sx,this.sy);
 			return dst1;
 		}
 
@@ -5460,10 +5457,10 @@ TODO:
 
 		if (ignoretransparent) {
 			if (gdImageTrueColor(src)) {
-				dst1->transparent = src->transparent;
+				dst1.transparent = this.transparent;
 			} else {
 
-				dst1->transparent = GdUtils.trueColorMixAlpha(gdImageRed(src, src -> transparent), gdImageBlue(src, src -> transparent), gdImageGreen(src, src -> transparent), 127);
+				dst1.transparent = GdUtils.trueColorMixAlpha(gdImageRed(src, transparent), gdImageBlue(src, transparent), gdImageGreen(src, transparent), 127);
 			}
 		}
 
