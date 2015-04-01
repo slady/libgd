@@ -1,6 +1,14 @@
 package info.miranda.gd.utils;
 
 import info.miranda.gd.GdPointF;
+import info.miranda.gd.GdUtils;
+
+import static java.lang.Math.PI;
+import static java.lang.Math.abs;
+import static java.lang.Math.cos;
+import static java.lang.Math.sin;
+import static java.lang.Math.sqrt;
+import static java.lang.Math.tan;
 
 /**
  * Title: Matrix
@@ -54,13 +62,14 @@ public class GdAffine {
 	 * Returns:
 	 *  GD_TRUE if the affine is rectilinear or GD_FALSE
 	 */
-	public boolean invert(final GdAffine dst) {
+	public GdAffine invert() {
 		double r_det = (this.affine[0] * this.affine[3] - this.affine[1] * this.affine[2]);
 
 		if (r_det <= 0.0) {
-			return false;
+			return null;
 		}
 
+		final GdAffine dst = new GdAffine();
 		r_det = 1.0 / r_det;
 		dst.affine[0] = this.affine[3] * r_det;
 		dst.affine[1] = -this.affine[1] * r_det;
@@ -68,7 +77,7 @@ public class GdAffine {
 		dst.affine[3] = this.affine[0] * r_det;
 		dst.affine[4] = -this.affine[4] * dst.affine[0] - this.affine[5] * dst.affine[2];
 		dst.affine[5] = -this.affine[4] * dst.affine[1] - this.affine[5] * dst.affine[3];
-		return true;
+		return dst;
 	}
 
 	/**
@@ -88,13 +97,15 @@ public class GdAffine {
 	 * Returns:
 	 *  GD_TRUE on success or GD_FALSE
 	 */
-	public void flip(final GdAffine dst, final boolean flip_h, final boolean flip_v) {
+	public GdAffine flip(final boolean flip_h, final boolean flip_v) {
+		final GdAffine dst = new GdAffine();
 		dst.affine[0] = flip_h ? - this.affine[0] : this.affine[0];
 		dst.affine[1] = flip_h ? - this.affine[1] : this.affine[1];
 		dst.affine[2] = flip_v ? - this.affine[2] : this.affine[2];
 		dst.affine[3] = flip_v ? - this.affine[3] : this.affine[3];
 		dst.affine[4] = flip_h ? - this.affine[4] : this.affine[4];
 		dst.affine[5] = flip_v ? - this.affine[5] : this.affine[5];
+		return dst;
 	}
 
 	/**
@@ -114,7 +125,7 @@ public class GdAffine {
 	 * Returns:
 	 *  GD_TRUE on success or GD_FALSE
 	 */
-	public GdAffine concat(final GdAffine m1, final GdAffine m2) {
+	public void concat(final GdAffine dst, final GdAffine m1, final GdAffine m2) {
 		final double dst0, dst1, dst2, dst3, dst4, dst5;
 
 		dst0 = m1.affine[0] * m2.affine[0] + m1.affine[1] * m2.affine[2];
@@ -141,15 +152,15 @@ public class GdAffine {
 	 * Returns:
 	 *  GD_TRUE on success or GD_FALSE
 	 */
-	public int gdAffineIdentity (double dst[6])
-	{
-		dst[0] = 1;
-		dst[1] = 0;
-		dst[2] = 0;
-		dst[3] = 1;
-		dst[4] = 0;
-		dst[5] = 0;
-		return GD_TRUE;
+	public GdAffine identity() {
+		final GdAffine dst = new GdAffine();
+		dst.affine[0] = 1;
+		dst.affine[1] = 0;
+		dst.affine[2] = 0;
+		dst.affine[3] = 1;
+		dst.affine[4] = 0;
+		dst.affine[5] = 0;
+		return dst;
 	}
 
 	/**
@@ -163,15 +174,15 @@ public class GdAffine {
 	 * Returns:
 	 *  GD_TRUE on success or GD_FALSE
 	 */
-	public int gdAffineScale (double dst[6], final double scale_x, final double scale_y)
-	{
-		dst[0] = scale_x;
-		dst[1] = 0;
-		dst[2] = 0;
-		dst[3] = scale_y;
-		dst[4] = 0;
-		dst[5] = 0;
-		return GD_TRUE;
+	public GdAffine scale(final double scale_x, final double scale_y) {
+		final GdAffine dst = new GdAffine();
+		dst.affine[0] = scale_x;
+		dst.affine[1] = 0;
+		dst.affine[2] = 0;
+		dst.affine[3] = scale_y;
+		dst.affine[4] = 0;
+		dst.affine[5] = 0;
+		return dst;
 	}
 
 	/**
@@ -188,18 +199,18 @@ public class GdAffine {
 	 * Returns:
 	 *  GD_TRUE on success or GD_FALSE
 	 */
-	public int gdAffineRotate (double dst[6], final double angle)
-	{
-		final double sin_t = sin (angle * M_PI / 180.0);
-		final double cos_t = cos (angle * M_PI / 180.0);
+	public GdAffine rotate(final double angle) {
+		final GdAffine dst = new GdAffine();
+		final double sin_t = sin(angle * PI / 180.0);
+		final double cos_t = cos(angle * PI / 180.0);
 
-		dst[0] = cos_t;
-		dst[1] = sin_t;
-		dst[2] = -sin_t;
-		dst[3] = cos_t;
-		dst[4] = 0;
-		dst[5] = 0;
-		return GD_TRUE;
+		dst.affine[0] = cos_t;
+		dst.affine[1] = sin_t;
+		dst.affine[2] = -sin_t;
+		dst.affine[3] = cos_t;
+		dst.affine[4] = 0;
+		dst.affine[5] = 0;
+		return dst;
 	}
 
 	/**
@@ -213,15 +224,15 @@ public class GdAffine {
 	 * Returns:
 	 *  GD_TRUE on success or GD_FALSE
 	 */
-	public int gdAffineShearHorizontal(double dst[6], final double angle)
-	{
-		dst[0] = 1;
-		dst[1] = 0;
-		dst[2] = tan(angle * M_PI / 180.0);
-		dst[3] = 1;
-		dst[4] = 0;
-		dst[5] = 0;
-		return GD_TRUE;
+	public GdAffine shearHorizontal(final double angle) {
+		final GdAffine dst = new GdAffine();
+		dst.affine[0] = 1;
+		dst.affine[1] = 0;
+		dst.affine[2] = tan(angle * PI / 180.0);
+		dst.affine[3] = 1;
+		dst.affine[4] = 0;
+		dst.affine[5] = 0;
+		return dst;
 	}
 
 	/**
@@ -235,15 +246,15 @@ public class GdAffine {
 	 * Returns:
 	 *  GD_TRUE on success or GD_FALSE
 	 */
-	public int gdAffineShearVertical(double dst[6], final double angle)
-	{
-		dst[0] = 1;
-		dst[1] = tan(angle * M_PI / 180.0);
-		dst[2] = 0;
-		dst[3] = 1;
-		dst[4] = 0;
-		dst[5] = 0;
-		return GD_TRUE;
+	public GdAffine shearVertical(final double angle) {
+		final GdAffine dst = new GdAffine();
+		dst.affine[0] = 1;
+		dst.affine[1] = tan(angle * PI / 180.0);
+		dst.affine[2] = 0;
+		dst.affine[3] = 1;
+		dst.affine[4] = 0;
+		dst.affine[5] = 0;
+		return dst;
 	}
 
 	/**
@@ -258,15 +269,15 @@ public class GdAffine {
 	 * Returns:
 	 *  GD_TRUE on success or GD_FALSE
 	 */
-	public int gdAffineTranslate (double dst[6], final double offset_x, final double offset_y)
-	{
-		dst[0] = 1;
-		dst[1] = 0;
-		dst[2] = 0;
-		dst[3] = 1;
-		dst[4] = offset_x;
-		dst[5] = offset_y;
-		return GD_TRUE;
+	public GdAffine translate(final double offset_x, final double offset_y) {
+		final GdAffine dst = new GdAffine();
+		dst.affine[0] = 1;
+		dst.affine[1] = 0;
+		dst.affine[2] = 0;
+		dst.affine[3] = 1;
+		dst.affine[4] = offset_x;
+		dst.affine[5] = offset_y;
+		return dst;
 	}
 
 	/**
@@ -280,9 +291,8 @@ public class GdAffine {
 	 *
 	 *  GD_TRUE on success or GD_FALSE
 	 **/
-	public double gdAffineExpansion ()
-	{
-		return sqrt (fabs (this.affine[0] * this.affine[3] - this.affine[1] * this.affine[2]));
+	public double expansion() {
+		return sqrt(abs(this.affine[0] * this.affine[3] - this.affine[1] * this.affine[2]));
 	}
 
 	/**
@@ -296,10 +306,9 @@ public class GdAffine {
 	 * Returns:
 	 *  GD_TRUE if the affine is rectilinear or GD_FALSE
 	 */
-	public int gdAffineRectilinear (final double m[6])
-	{
-		return ((fabs (m[1]) < GD_EPSILON && fabs (m[2]) < GD_EPSILON) ||
-				(fabs (m[0]) < GD_EPSILON && fabs (m[3]) < GD_EPSILON));
+	public boolean rectilinear() {
+		return ((abs(this.affine[1]) < GdUtils.GD_EPSILON && abs(this.affine[2]) < GdUtils.GD_EPSILON) ||
+				(abs(this.affine[0]) < GdUtils.GD_EPSILON && abs(this.affine[3]) < GdUtils.GD_EPSILON));
 	}
 
 	/**
@@ -315,12 +324,12 @@ public class GdAffine {
 	 * 	GD_TRUE on success or GD_FALSE
 	 */
 	public boolean equal(final GdAffine m1, final GdAffine m2) {
-		return (fabs (m1.affine[0] - m2.affine[0]) < GD_EPSILON &&
-				fabs (m1.affine[1] - m2.affine[1]) < GD_EPSILON &&
-				fabs (m1.affine[2] - m2.affine[2]) < GD_EPSILON &&
-				fabs (m1.affine[3] - m2.affine[3]) < GD_EPSILON &&
-				fabs (m1.affine[4] - m2.affine[4]) < GD_EPSILON &&
-				fabs (m1.affine[5] - m2.affine[5]) < GD_EPSILON);
+		return (abs(m1.affine[0] - m2.affine[0]) < GdUtils.GD_EPSILON &&
+				abs(m1.affine[1] - m2.affine[1]) < GdUtils.GD_EPSILON &&
+				abs(m1.affine[2] - m2.affine[2]) < GdUtils.GD_EPSILON &&
+				abs(m1.affine[3] - m2.affine[3]) < GdUtils.GD_EPSILON &&
+				abs(m1.affine[4] - m2.affine[4]) < GdUtils.GD_EPSILON &&
+				abs(m1.affine[5] - m2.affine[5]) < GdUtils.GD_EPSILON);
 	}
 
 
