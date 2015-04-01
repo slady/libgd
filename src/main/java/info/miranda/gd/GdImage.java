@@ -7,13 +7,13 @@ import info.miranda.gd.enums.GdInterpolationMethod;
 import info.miranda.gd.filter.*;
 import info.miranda.gd.interfaces.GdCallbackImageColor;
 import info.miranda.gd.interfaces.GdFilterInterface;
-import info.miranda.gd.interfaces.GdInterpolation;
 import info.miranda.gd.utils.GdRect;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Stack;
 
+import static info.miranda.gd.utils.GdMath.fmod;
 import static java.lang.Math.PI;
 import static java.lang.Math.abs;
 import static java.lang.Math.exp;
@@ -4461,7 +4461,6 @@ TODO:
 					int[] src_offset_y = new int[16];
 					char red, green, blue, alpha;
 					long f_red=0, f_green=0, f_blue=0, f_alpha=0;
-					int k;
 
 					if ((m < 1) || (n < 1)) {
 						src_offset_x[0] = n;
@@ -4585,33 +4584,34 @@ TODO:
 						src_offset_y[15] = m;
 					}
 
-					for (k=-1; k<3; k++) {
-						final long f = gd_itofx(k)-f_f;
-						final long f_fm1 = f - f_1;
-						final long f_fp1 = f + f_1;
-						final long f_fp2 = f + f_2;
-						long f_a = 0, f_b = 0,f_c = 0, f_d = 0;
+					for (int k=-1; k<3; k++) {
 						long f_RY;
-						int l;
+						{
+							final long f = gd_itofx(k)-f_f;
+							final long f_fm1 = f - f_1;
+							final long f_fp1 = f + f_1;
+							final long f_fp2 = f + f_2;
+							long f_a = 0, f_b = 0,f_c = 0, f_d = 0;
 
-						if (f_fp2 > 0) {
-							f_a = gd_mulfx(f_fp2,gd_mulfx(f_fp2,f_fp2));
+							if (f_fp2 > 0) {
+								f_a = gd_mulfx(f_fp2,gd_mulfx(f_fp2,f_fp2));
+							}
+
+							if (f_fp1 > 0) {
+								f_b = gd_mulfx(f_fp1,gd_mulfx(f_fp1,f_fp1));
+							}
+
+							if (f > 0) {
+								f_c = gd_mulfx(f,gd_mulfx(f,f));
+							}
+
+							if (f_fm1 > 0) {
+								f_d = gd_mulfx(f_fm1,gd_mulfx(f_fm1,f_fm1));
+							}
+							f_RY = gd_divfx((f_a-gd_mulfx(f_4,f_b)+gd_mulfx(f_6,f_c)-gd_mulfx(f_4,f_d)),f_6);
 						}
 
-						if (f_fp1 > 0) {
-							f_b = gd_mulfx(f_fp1,gd_mulfx(f_fp1,f_fp1));
-						}
-
-						if (f > 0) {
-							f_c = gd_mulfx(f,gd_mulfx(f,f));
-						}
-
-						if (f_fm1 > 0) {
-							f_d = gd_mulfx(f_fm1,gd_mulfx(f_fm1,f_fm1));
-						}
-						f_RY = gd_divfx((f_a-gd_mulfx(f_4,f_b)+gd_mulfx(f_6,f_c)-gd_mulfx(f_4,f_d)),f_6);
-
-						for (l=-1;  l< 3; l++) {
+						for (int l=-1;  l< 3; l++) {
 							final long f = gd_itofx(l) - f_g;
 							final long f_fm1 = f - f_1;
 							final long f_fp1 = f + f_1;
@@ -4685,7 +4685,7 @@ TODO:
 	/* round to two decimals and keep the 100x multiplication to use it in the common square angles
 	   case later. Keep the two decimal precisions so smaller rotation steps can be done, useful for
 	   slow animations, f.e. */
-		final int angle_rounded = fmod((int) floorf(angle * 100), 360 * 100);
+		final int angle_rounded = fmod((int) floor(angle * 100), 360 * 100);
 
 		if (bgcolor < 0) {
 			return null;
