@@ -1,20 +1,3 @@
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
-#ifndef GD_H
-#define GD_H 1
-
-#ifdef __cplusplus
-	extern "C"
-	{
-#endif
-
-/* stdio is needed for file I/O. */
-#include <stdio.h>
-#include <stdarg.h>
-#include "gd_io.h"
 
 
 /* define struct with name and func ptr and add it to gdImageStruct gdInterpolationMethod interpolation; */
@@ -495,50 +478,3 @@ BGD_DECLARE(gdInterpolationMethod) gdImageGetInterpolationMethod(gdImagePtr im);
 BGD_DECLARE(gdImagePtr) gdImageScale(const gdImagePtr src, const unsigned int new_width, const unsigned int new_height);
 
 BGD_DECLARE(gdImagePtr) gdImageRotateInterpolated(const gdImagePtr src, const float angle, int bgcolor);
-
-BGD_DECLARE(int) gdAffineApplyToPointF (gdPointFPtr dst, const gdPointFPtr src, const double affine[6]);
-BGD_DECLARE(int) gdAffineInvert (double dst[6], const double src[6]);
-BGD_DECLARE(int) gdAffineFlip (double dst_affine[6], const double src_affine[6], const int flip_h, const int flip_v);
-BGD_DECLARE(int) gdAffineConcat (double dst[6], const double m1[6], const double m2[6]);
-
-BGD_DECLARE(int) gdAffineIdentity (double dst[6]);
-BGD_DECLARE(int) gdAffineScale (double dst[6], const double scale_x, const double scale_y);
-BGD_DECLARE(int) gdAffineRotate (double dst[6], const double angle);
-BGD_DECLARE(int) gdAffineShearHorizontal (double dst[6], const double angle);
-BGD_DECLARE(int) gdAffineShearVertical(double dst[6], const double angle);
-BGD_DECLARE(int) gdAffineTranslate (double dst[6], const double offset_x, const double offset_y);
-BGD_DECLARE(double) gdAffineExpansion (const double src[6]);
-BGD_DECLARE(int) gdAffineRectilinear (const double src[6]);
-BGD_DECLARE(int) gdAffineEqual (const double matrix1[6], const double matrix2[6]);
-BGD_DECLARE(int) gdTransformAffineGetImage(gdImagePtr *dst, const gdImagePtr src, gdRectPtr src_area, const double affine[6]);
-BGD_DECLARE(int) gdTransformAffineCopy(gdImagePtr dst, int dst_x, int dst_y, const gdImagePtr src, gdRectPtr src_region, const double affine[6]);
-/*
-gdTransformAffineCopy(gdImagePtr dst, int x0, int y0, int x1, int y1,
-		      const gdImagePtr src, int src_width, int src_height,
-		      const double affine[6]);
-*/
-BGD_DECLARE(int) gdTransformAffineBoundingBox(gdRectPtr src, const double affine[6], gdRectPtr bbox);
-
-
-
-
-/* Version information functions */
-BGD_DECLARE(int) gdMajorVersion(void);
-BGD_DECLARE(int) gdMinorVersion(void);
-BGD_DECLARE(int) gdReleaseVersion(void);
-BGD_DECLARE(const char *) gdExtraVersion(void);
-BGD_DECLARE(const char *) gdVersionString(void);
-
-
-#ifdef __cplusplus
-}
-#endif
-
-/* newfangled special effects */
-#include "gdfx.h"
-
-#endif				/* GD_H */
-
-#ifdef __cplusplus
-}
-#endif
