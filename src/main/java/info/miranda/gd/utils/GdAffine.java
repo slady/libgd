@@ -125,7 +125,7 @@ public class GdAffine {
 	 * Returns:
 	 *  GD_TRUE on success or GD_FALSE
 	 */
-	public void concat(final GdAffine dst, final GdAffine m1, final GdAffine m2) {
+	public static void concat(final GdAffine dst, final GdAffine m1, final GdAffine m2) {
 		final double dst0, dst1, dst2, dst3, dst4, dst5;
 
 		dst0 = m1.affine[0] * m2.affine[0] + m1.affine[1] * m2.affine[2];
@@ -269,7 +269,7 @@ public class GdAffine {
 	 * Returns:
 	 *  GD_TRUE on success or GD_FALSE
 	 */
-	public GdAffine translate(final double offset_x, final double offset_y) {
+	public static GdAffine translate(final double offset_x, final double offset_y) {
 		final GdAffine dst = new GdAffine();
 		dst.affine[0] = 1;
 		dst.affine[1] = 0;
