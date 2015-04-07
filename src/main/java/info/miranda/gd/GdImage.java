@@ -4783,8 +4783,8 @@ TODO:
 	 *  GD_TRUE if the affine is rectilinear or GD_FALSE
 	 */
 	public GdImage gdTransformAffineGetImage(GdRect src_area, final GdAffine affine) {
-		int res;
-		GdRect area_full;
+		final int res;
+		final GdRect area_full = new GdRect();
 
 		if (src_area == null) {
 			area_full.x = 0;
@@ -4809,7 +4809,8 @@ TODO:
 
 		dst.setAlphaBlending(GdEffect.REPLACE);
 
-		return gdTransformAffineCopy(*dst, 0, 0, this, src_area, m);
+		gdTransformAffineCopy(dst, 0, 0, this, src_area, m);
+		return dst;
 	}
 
 	/**
