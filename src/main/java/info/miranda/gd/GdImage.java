@@ -4342,20 +4342,17 @@ TODO:
 					final long f_w3 = gd_mulfx(f_f, f_1-f_g);
 					final long f_w4 = gd_mulfx(f_f, f_g);
 
+					src_offset_x = n + 1;
+					src_offset_y = m + 1;
+
 					if (n < src_w - 1) {
-						src_offset_x = n + 1;
 						src_offset_y = m;
 					}
 
 					if (m < src_h - 1) {
 						src_offset_x = n;
-						src_offset_y = m + 1;
 					}
 
-					if (!((n >= src_w - 1) || (m >= src_h - 1))) {
-						src_offset_x = n + 1;
-						src_offset_y = m + 1;
-					}
 					{
 						final int pixel1 = tpixels[src_offset_y][src_offset_x];
 						int pixel2, pixel3, pixel4;
