@@ -4832,8 +4832,7 @@ TODO:
 	 */
 	public boolean gdTransformAffineCopy(GdImage dst, int dst_x, int dst_y, final GdImage src, GdRect src_region, final GdAffine affine) {
 		int c1x,c1y,c2x,c2y;
-		boolean backclip = false;
-		int backup_clipx1, backup_clipy1, backup_clipx2, backup_clipy2;
+		final GdClipRectangle backup_clip;
 		int end_x, end_y;
 		GdInterpolationMethod interpolation_id_bak = GdInterpolationMethod.GD_DEFAULT;
 
@@ -4850,28 +4849,16 @@ TODO:
 		if (src_region.x > 0 || src_region.y > 0
 				|| src_region.width < src.sx
 				|| src_region.height < src.sy) {
-			backclip = true;
-
-			final GdClipRectangle clip = src.getClip();
-			backup_clipx1 = clip.x0;
-			backup_clipy1 = clip.y0;
-			backup_clipx2 = clip.x1;
-			backup_clipy2 = clip.y1;
+			backup_clip = src.getClip();
 
 			src.setClip(src_region.x, src_region.y,
 					src_region.x + src_region.width - 1,
 					src_region.y + src_region.height - 1);
+		} else {
+			backup_clip = null;
 		}
 
 		final GdRect bbox = gdTransformAffineBoundingBox(src_region, affine);
-		if (bbox == null) {
-			if (backclip) {
-				src.setClip(backup_clipx1, backup_clipy1,
-						backup_clipx2, backup_clipy2);
-			}
-			src.setInterpolationMethod(interpolation_id_bak);
-			return false;
-		}
 
 		final GdClipRectangle clip = dst.getClip();
 		c1x = clip.x0;
@@ -4922,9 +4909,8 @@ TODO:
 		}
 
 	/* Restore clip if required */
-		if (backclip) {
-			src.setClip(backup_clipx1, backup_clipy1,
-					backup_clipx2, backup_clipy2);
+		if (backup_clip != null) {
+			src.setClip(clip.x0, clip.y0, clip.x1, clip.y1);
 		}
 
 		src.setInterpolationMethod(interpolation_id_bak);
